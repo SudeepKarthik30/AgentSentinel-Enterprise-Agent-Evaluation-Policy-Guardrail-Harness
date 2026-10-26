@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="framer">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentSentinel | Support Chat Console</title>
+  <link rel="stylesheet" href="/static/css/tokens.css">
+  <link rel="stylesheet" href="/static/css/layout.css">
+  <link rel="stylesheet" href="/static/css/chat.css">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="brand-logo-mark">
+        <div class="brand-logo-mark-inner"></div>
+      </div>
+      <div class="brand-title">AgentSentinel</div>
+      <div class="brand-subtitle">Support Chat Console</div>
+    </div>
+
+    <!-- Header Actions -->
+    <div class="header-actions">
+      <a href="http://127.0.0.1:8002" target="_blank" class="model-pill-badge" style="text-decoration: none; cursor: pointer;">
+        <span class="status-dot"></span>
+        <span>Open Eval Dashboard (:8002)</span>
+      </a>
+      <button type="button" id="themeToggleBtn" class="theme-toggle-btn">
+        Theme: Framer (Dark)
+      </button>
+    </div>
+  </header>
+
+  <!-- Centered Box Chat Layout -->
+  <main class="app-container" style="display: flex; align-items: center; justify-content: center;">
+    <section class="chat-view-container">
+      
+      <div class="chat-box">
+        
+        <!-- Chat Box Header with Model Selector & Reset Button -->
+        <div class="chat-box-header">
+          <div class="chat-box-title-group">
+            <span class="chat-status-dot"></span>
+            <span class="chat-box-title">Refund Specialist Agent</span>
+          </div>
+
+          <div class="chat-header-controls">
+            <!-- Active Model Indicator -->
+            <select id="chatModelSelect" class="chat-model-select">
+              <option value="llama" selected>OpenAI OSS (20B)</option>
+            </select>
+
+            <!-- Reset Messages Button -->
+            <button type="button" id="resetChatBtn" class="btn-reset-chat">
+              Reset Messages
+            </button>
+          </div>
+        </div>
+
+        <!-- Messages Transcript Scroll Area -->
+        <div id="messagesList" class="chat-messages-container">
+          <div class="chat-bubble-card agent">
+            <div class="bubble-role-meta">Refund Specialist Agent</div>
+            <div class="bubble-content">
+              Hello, I am your customer refund specialist. Please let me know your username and which purchased item you would like to return.
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Input Bar -->
+        <div class="chat-input-bar">
+          <form id="chatForm" class="chat-form">
+            <input 
+              type="text" 
+              id="chatInput" 
+              class="chat-text-input" 
+              placeholder="Type your refund request or inquiry..." 
+              autocomplete="off" 
+              required
+            >
+            <button type="submit" id="chatSendBtn" class="btn-send-chat">Send</button>
+          </form>
+        </div>
+
+      </div>
+
+    </section>
+  </main>
+
+  <script>
+    // Theme Switcher for Chat Console
+    const themeBtn = document.getElementById("themeToggleBtn");
+    if (themeBtn) {
+      const currentTheme = localStorage.getItem("agent_eval_theme") || "framer";
+      document.documentElement.setAttribute("data-theme", currentTheme);
+      themeBtn.textContent = currentTheme === "framer" ? "Theme: Framer (Dark)" : "Theme: Intercom (Cream)";
+
+      themeBtn.addEventListener("click", () => {
+        const active = document.documentElement.getAttribute("data-theme") || "framer";
+        const next = active === "framer" ? "intercom" : "framer";
+        document.documentElement.setAttribute("data-theme", next);
+        localStorage.setItem("agent_eval_theme", next);
+        themeBtn.textContent = next === "framer" ? "Theme: Framer (Dark)" : "Theme: Intercom (Cream)";
+      });
+    }
+  </script>
+  <script src="/static/js/marked.min.js"></script>
+  <script src="/static/js/chat.js"></script>
+</body>
+</html>

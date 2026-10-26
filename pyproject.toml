@@ -1,0 +1,22 @@
+[project]
+name = "agentsentinel"
+version = "1.0.0"
+description = "Enterprise-grade LLM agent evaluation harness and policy guardrail framework"
+readme = "README.md"
+authors = [
+    { name = "Sudeepkarthik30", email = "thirkarthik30@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "deepeval>=4.3.1",
+    "dotenv>=0.9.9",
+    "langchain>=1.4.7",
+    "langchain-openai>=1.7.2",
+]
+
+[project.scripts]
+agent-eval = "agent_eval:main"
+
+[build-system]
+requires = ["uv_build>=0.12.24,<0.13.0"]
+build-backend = "uv_build"

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="framer">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentSentinel | Evaluation Dashboard</title>
+  <link rel="stylesheet" href="/static/css/tokens.css">
+  <link rel="stylesheet" href="/static/css/layout.css">
+  <link rel="stylesheet" href="/static/css/eval.css">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="brand-logo-mark">
+        <div class="brand-logo-mark-inner"></div>
+      </div>
+      <div class="brand-title">AgentSentinel</div>
+      <div class="brand-subtitle">Evaluation & Benchmark Dashboard</div>
+    </div>
+
+    <!-- Header Actions -->
+    <div class="header-actions">
+      <div class="model-pill-badge">
+        <span class="status-dot"></span>
+        <span id="headerModelStatus">Checking Models...</span>
+      </div>
+      <a href="http://127.0.0.1:8001" target="_blank" class="model-pill-badge" style="text-decoration: none; cursor: pointer;">
+        <span>Open Chat Console (:8001)</span>
+      </a>
+      <button type="button" id="themeToggleBtn" class="theme-toggle-btn">
+        Theme: Framer (Dark)
+      </button>
+    </div>
+  </header>
+
+  <!-- App Main Layout -->
+  <main class="app-container">
+    <section class="eval-view active" style="width: 100%;">
+
+      <!-- Top Control & Action Bar -->
+      <div class="eval-control-bar">
+        <div class="control-group">
+          <div class="control-item">
+            <span class="control-label">Target Model:</span>
+            <select id="evalModelSelect" class="control-select">
+              <option value="llama" selected>OpenAI OSS (20B)</option>
+            </select>
+          </div>
+
+          <div class="control-item">
+            <span class="control-label">Dataset Scope:</span>
+            <select id="evalCountSelect" class="control-select">
+              <option value="3">Quick Sample (3 Cases)</option>
+              <option value="5">Standard Sample (5 Cases)</option>
+              <option value="25" selected>Complete Benchmark (All 25 Golden Cases)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="eval-action-buttons">
+          <button type="button" id="startEvalBtn" class="btn-start-eval">Start Live Evaluation</button>
+          <button type="button" id="cancelEvalBtn" class="btn-cancel-eval" disabled>Stop Evaluation</button>
+        </div>
+      </div>
+
+      <!-- Model Status Card: OpenAI OSS (20B) -->
+      <div class="model-status-grid" style="grid-template-columns: 1fr;">
+        <div id="modelCard_llama" class="model-card">
+          <div class="model-card-header">
+            <div>
+              <div class="model-brand-title">OpenAI OSS (20B)</div>
+              <div class="model-brand-id">openai/gpt-oss-20b · Groq Fast Inference Engine</div>
+            </div>
+            <span class="status-badge idle">IDLE</span>
+          </div>
+          <div class="model-progress-bar-bg">
+            <div class="model-progress-bar-fill"></div>
+          </div>
+          <div class="model-stats-row">
+            <div class="stat-box">
+              <span class="stat-label">Pass Rate</span>
+              <span class="stat-value card-pass-rate">-</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">Cases</span>
+              <span class="stat-value card-case-count">0/0</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">Avg Latency</span>
+              <span class="stat-value card-latency">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Stepper & DeepEval Metrics Gauges -->
+      <div class="live-stepper-panel">
+        <div class="stepper-header">
+          <span id="stepperCaseTag" class="active-case-tag">Evaluation Idle</span>
+          <span id="stepperCatBadge" class="case-category-badge">Awaiting Run</span>
+        </div>
+        <div id="activeCaseQuery" class="stepper-query-preview">
+          Click "Start Live Evaluation" above to run live benchmarks across models.
+        </div>
+
+        <div class="metrics-gauges-grid">
+          
+          <div class="metric-gauge-card">
+            <div class="metric-gauge-header">
+              <span class="metric-gauge-title">Tool Correctness</span>
+              <span id="mToolStatus" class="metric-badge-status">WAITING</span>
+            </div>
+            <div id="mToolScore" class="metric-score-value">-</div>
+          </div>
+
+          <div class="metric-gauge-card">
+            <div class="metric-gauge-header">
+              <span class="metric-gauge-title">Answer Correctness</span>
+              <span id="mAnswerStatus" class="metric-badge-status">WAITING</span>
+            </div>
+            <div id="mAnswerScore" class="metric-score-value">-</div>
+          </div>
+
+          <div class="metric-gauge-card">
+            <div class="metric-gauge-header">
+              <span class="metric-gauge-title">Argument Correctness</span>
+              <span id="mArgStatus" class="metric-badge-status">WAITING</span>
+            </div>
+            <div id="mArgScore" class="metric-score-value">-</div>
+          </div>
+
+          <div class="metric-gauge-card">
+            <div class="metric-gauge-header">
+              <span class="metric-gauge-title">Task Completion</span>
+              <span id="mTaskStatus" class="metric-badge-status">WAITING</span>
+            </div>
+            <div id="mTaskScore" class="metric-score-value">-</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Live Test Results Table -->
+      <div class="results-table-section">
+        <div class="section-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span class="section-title">Live Test-Case Results Stream</span>
+            <span style="font-size: 11px; color: var(--ink-muted); margin-left: 8px;">DeepEval Execution Telemetry</span>
+          </div>
+          <button type="button" id="downloadCsvBtn" class="btn-download" disabled title="Download completed test results as CSV spreadsheet">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -1px; margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download Benchmark (CSV)
+          </button>
+        </div>
+        <div class="table-responsive-container">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th style="width: 45px;">#</th>
+                <th style="width: 80px;">Model</th>
+                <th style="min-width: 170px;">Input Query</th>
+                <th style="min-width: 190px;">Given Output (Model)</th>
+                <th style="min-width: 190px;">Expected Output</th>
+                <th style="min-width: 150px;">Tools Called</th>
+                <th style="width: 80px;" title="Tool Correctness Metric">Tool Cor.</th>
+                <th style="width: 80px;" title="Answer Correctness Metric">Ans Cor.</th>
+                <th style="width: 80px;" title="Argument Correctness Metric">Arg Cor.</th>
+                <th style="width: 80px;" title="Task Completion Metric">Task Comp.</th>
+                <th style="width: 75px;">Status</th>
+                <th style="width: 70px;">Latency</th>
+                <th style="width: 65px;">Inspect</th>
+              </tr>
+            </thead>
+            <tbody id="resultsTableBody">
+              <!-- Populated dynamically via eval.js with all matrices -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Comparative Multi-Model Leaderboard -->
+      <div id="leaderboardSection" class="leaderboard-section" style="display: none;">
+        <div class="section-header-bar">
+          <span class="section-title">Multi-Model Comparative Leaderboard</span>
+          <span style="font-size: 11px; color: var(--ink-muted);">Final Benchmark Summary</span>
+        </div>
+        <table class="leaderboard-table">
+          <thead>
+            <tr>
+              <th style="width: 50px;">Rank</th>
+              <th>Candidate Model</th>
+              <th>Provider</th>
+              <th>Pass Rate</th>
+              <th>Status</th>
+              <th>Avg Score</th>
+              <th>Avg Latency</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboardTableBody">
+            <!-- Populated dynamically via eval.js upon run completion -->
+          </tbody>
+        </table>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Modal Drawer for Case Inspection -->
+  <div id="caseModal" class="case-modal-overlay">
+    <div class="case-modal-content">
+      <div class="modal-header">
+        <span id="modalCaseTitle" class="modal-title">Test Case Details</span>
+        <button type="button" id="closeModalBtn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        
+        <div class="modal-section-box">
+          <span class="modal-field-title">User Query (Input)</span>
+          <div id="modalInput" class="modal-field-content"></div>
+        </div>
+
+        <div id="modalErrorSection" class="modal-section-box" style="display: none;">
+          <span class="modal-field-title" style="color: var(--semantic-error);">Error / Diagnostics</span>
+          <div id="modalErrorContent" class="modal-field-content" style="color: var(--semantic-error);"></div>
+        </div>
+
+        <div class="modal-section-box">
+          <span class="modal-field-title">Actual Agent Output</span>
+          <div id="modalActualOutput" class="modal-field-content"></div>
+        </div>
+
+        <div class="modal-section-box">
+          <span class="modal-field-title">Expected Output</span>
+          <div id="modalExpectedOutput" class="modal-field-content"></div>
+        </div>
+
+        <div class="modal-section-box">
+          <span class="modal-field-title">Tools Invoked</span>
+          <div id="modalToolsCalled" class="modal-field-content code"></div>
+        </div>
+
+        <div class="modal-section-box">
+          <span class="modal-field-title">Expected Tools</span>
+          <div id="modalExpectedTools" class="modal-field-content code"></div>
+        </div>
+
+        <div class="modal-section-box">
+          <span class="modal-field-title">DeepEval Metrics Breakdown & Reasoning</span>
+          <div id="modalMetricsJson" class="modal-field-content code"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Theme Switcher & Model Status for Eval Dashboard
+    const themeBtn = document.getElementById("themeToggleBtn");
+    if (themeBtn) {
+      const currentTheme = localStorage.getItem("agent_eval_theme") || "framer";
+      document.documentElement.setAttribute("data-theme", currentTheme);
+      themeBtn.textContent = currentTheme === "framer" ? "Theme: Framer (Dark)" : "Theme: Intercom (Cream)";
+
+      themeBtn.addEventListener("click", () => {
+        const active = document.documentElement.getAttribute("data-theme") || "framer";
+        const next = active === "framer" ? "intercom" : "framer";
+        document.documentElement.setAttribute("data-theme", next);
+        localStorage.setItem("agent_eval_theme", next);
+        themeBtn.textContent = next === "framer" ? "Theme: Framer (Dark)" : "Theme: Intercom (Cream)";
+      });
+    }
+
+    // Health check on models
+    fetch("/api/models/status")
+      .then(res => res.json())
+      .then(models => {
+        const pill = document.getElementById("headerModelStatus");
+        if (pill) {
+          const readyCount = models.filter(m => m.configured).length;
+          pill.textContent = `${readyCount}/${models.length} Models Ready`;
+        }
+      })
+      .catch(console.warn);
+  </script>
+  <script src="/static/js/eval.js"></script>
+</body>
+</html>
