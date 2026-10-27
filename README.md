@@ -155,7 +155,7 @@ uv pip install -e .
 Create a `.env` file in the root directory (refer to `.env.example`):
 ```env
 GROQ_API_KEY="your_groq_api_key_here"
-LLAMA_MODEL="openai/gpt-oss-20b"
+MODEL_Name="openai/gpt-oss-20b"
 ```
 
 ### 3. Launch Dashboards
