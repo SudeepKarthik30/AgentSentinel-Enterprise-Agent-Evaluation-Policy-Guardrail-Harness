@@ -1,0 +1,132 @@
+\section{Domain Analysis and Operational Context}
+\label{sec:req_domain}
+To rigorously ground the design and empirical validation of EffectGuard, this investigation selects enterprise e-commerce customer support and automated refund processing as the primary operational domain. Automated refund processing represents an ideal crucible for studying agent execution safety for three fundamental reasons:
+\begin{enumerate}
+    \item \textbf{High-Stakes Financial Invariants:} Tool invocations directly trigger financial payouts and ledger updates. Errors do not merely degrade conversational quality; they cause immediate, quantifiable financial loss.
+    \item \textbf{Strict Temporal and Relational Boundaries:} Eligibility is governed by hard mathematical rules (e.g., a rolling 30-day return policy, item purchase dates, and inventory status) rather than subjective interpretation.
+    \item \textbf{Multi-State Transaction Lifecycles:} Fulfilling a customer refund requires multi-step orchestration: identifying the customer, retrieving order history, calculating eligible balances across mixed multi-item carts, staging items, and committing permanent financial tickets.
+\end{enumerate}
+
+In this operational setting, an autonomous agent interacts with human customers who present diverse requests, ranging from simple balance inquiries to complex partial returns containing both eligible and expired items. The agent operates over a persistent relational database storing user accounts, historical purchases, item statuses, and financial refund tickets.
+
+\section{User Personas, Threat Models and Adversarial Scenarios}
+\label{sec:req_personas_threat}
+
+\subsection{User Personas}
+The system must safely handle four distinct operational personas:
+\begin{itemize}
+    \item \textbf{Persona 1: The Legitimate Customer:} An authenticated user requesting returns for items purchased within the valid 30-day window, expecting prompt resolution and accurate confirmation.
+    \item \textbf{Persona 2: The Edge-Case / Mixed-Cart Customer:} A customer requesting refunds for multiple items simultaneously, where some items are eligible, others are expired (e.g., purchased 31 days prior), and others were never purchased on the account.
+    \item \textbf{Persona 3: The Adversarial / Exploitative User:} A malicious actor attempting prompt injections, requesting refunds for non-existent accounts, attempting negative refund values to credit internal balances, or attempting large financial extractions exceeding corporate policy.
+    \item \textbf{Persona 4: The Internal Compliance Auditor:} An automated telemetry pipeline or human auditor inspecting database state to verify that financial payouts match customer conversational transcripts without discrepancies.
+\end{itemize}
+
+\subsection{Threat Model and Failure Scenarios}
+We establish a formal threat model encompassing four critical failure vectors:
+\begin{enumerate}
+    \item \textbf{Threat 1: Distributed Network Chaos (Post-Commit 504 Timeouts):} Transient socket disconnects or HTTP 504 Gateway Timeouts occurring immediately after a tool has committed a row to the database. Without idempotency and recovery, naive agents retry and duplicate payouts.
+    \item \textbf{Threat 2: Adversarial Parameter Manipulation:} Malicious prompt inputs designed to trick the LLM into invoking state-mutating tools with negative refund amounts (e.g., \texttt{-\$500}), zero amounts, or amounts exceeding the \$500 corporate ceiling.
+    \item \textbf{Threat 3: Cross-Session Duplicate Refund Exploits:} A user initiates a new chat session after receiving a legitimate refund, attempting to claim a second refund on the same purchase. If the database does not track item-level status permanently, the agent re-reads the order history and issues duplicate refunds.
+    \item \textbf{Threat 4: Temporal Cutoff Drift:} Natural-language date reasoning failures where the model misclassifies day 29, day 30, day 31, or invalid future purchase dates.
+\end{enumerate}
+
+\section{Functional Requirements}
+\label{sec:req_functional}
+The system architecture must satisfy eight explicit Functional Requirements (FRs):
+
+\begin{itemize}
+    \item \textbf{FR1: Tool Effect Classification:} The execution gateway must classify all available tools into distinct effect classes: \texttt{read\_only} (convergent queries that do not alter persistent state) and \texttt{irreversible} (state-mutating actions that write financial records or alter item statuses). Non-mutating tools must pass through with zero barrier, while irreversible tools must be strictly intercepted.
+    \item \textbf{FR2: Deterministic Precondition Gating (Policy-as-Code):} Prior to executing any irreversible tool, the gateway must evaluate declarative business invariants in pure deterministic code, completely bypassing the LLM prompt. The gate must reject calls violating user existence, positive amount constraints, safety ceilings, or remaining balance limits.
+    \item \textbf{FR3: Deterministic Cryptographic Idempotency Generation:} The gateway must compute an order-independent, canonical SHA-256 idempotency key for every mutating tool execution derived from the session thread ID, tool name, and canonical argument payload.
+    \item \textbf{FR4: Write-Ahead Journaling (WAL):} The gateway must maintain a persistent, non-volatile execution journal recording every mutating invocation lifecycle: transitioning atomically from \texttt{PENDING} to \texttt{COMMITTED} or \texttt{FAILED}.
+    \item \textbf{FR5: Automated Verify-Before-Retry Recovery:} Upon intercepting a network timeout, the gateway must automatically query the persistent ledger using the idempotency key. If the transaction committed before the timeout, it must return the cached receipt without re-executing the tool. If uncommitted, it must retry safely once under the same idempotency key.
+    \item \textbf{FR6: Dual-Pass Claim-vs-Ledger Auditing:} The evaluation harness must extract agent claims from both structured output fields and natural-language responses, compare them against persistent database state, and classify discrepancies into \texttt{FALSE\_CLAIM}, \texttt{GHOST\_MUTATION}, and \texttt{AMOUNT\_DRIFT}.
+    \item \textbf{FR7: Hermetic Frozen-Epoch Evaluation:} The evaluation framework must anchor all temporal calculations to a fixed benchmark epoch (\texttt{BENCHMARK\_DATE="2026-10-26"}), ensuring that rolling 30-day boundary tests do not decay over time.
+    \item \textbf{FR8: Active Chaos Fault Injection Engine:} The system must incorporate an interceptor capable of injecting deterministic distributed faults at configurable probability rates (20\% and 35\%), including pre-execution drops, post-commit timeouts, and 500 server errors.
+\end{itemize}
+
+\section{Non-Functional Requirements}
+\label{sec:req_non_functional}
+The system must adhere to six rigorous Non-Functional Requirements (NFRs):
+
+\begin{itemize}
+    \item \textbf{NFR1: Strict Zero Duplicate State Mutations:} Under any chaos fault rate (up to 35\% network drops), the system must guarantee that exactly one financial ticket is committed for any unique eligible return request:
+    \begin{equation}
+        \forall \text{ request } r, \quad \text{Count}(\text{Tickets}(r)) \le 1
+    \end{equation}
+    \item \textbf{NFR2: Zero Financial Hallucinations:} The system must guarantee \$0.00 excess dollars refunded beyond verified eligible balances, completely eliminating unauthorized payouts.
+    \item \textbf{NFR3: Minimal Latency Overhead:} The execution gateway's precondition checking, idempotency hashing, and write-ahead journaling must introduce less than 10 milliseconds of computational overhead to tool invocation. End-to-end agent reasoning should complete within 3.5 seconds under standard network conditions.
+    \item \textbf{NFR4: High-Concurrency Relational Persistence:} The database layer must support concurrent, non-blocking reads and serialized writes using SQLite Write-Ahead Logging (\texttt{PRAGMA journal\_mode = WAL;}).
+    \item \textbf{NFR5: Hermetic Reproducibility:} The evaluation harness must be fully deterministic and hermetic: running the test suite multiple times against an isolated database must yield identical results without inter-test state leakage.
+    \item \textbf{NFR6: Declarative Extensibility:} Corporate business rules must reside in external human-readable configurations (\texttt{policy.yaml}), allowing non-engineering compliance teams to update ceilings or rules without modifying application source code.
+\end{itemize}
+
+\section{Formal System Invariants and Mathematical Formulation}
+\label{sec:req_invariants}
+To establish provable reliability, we formulate the business rules and safety boundaries as six formal mathematical invariants that must hold true across all system states:
+
+\subsection{Invariant 1: User Existence Invariant}
+A state-mutating tool $T_{\text{mut}}$ requesting execution for user $u$ is permitted if and only if $u$ exists in the set of registered users $\mathcal{U}$:
+\begin{equation}
+    \mathcal{I}_1: \quad u \in \mathcal{U}
+\end{equation}
+
+\subsection{Invariant 2: Strictly Positive Payout Invariant}
+The monetary amount $A$ requested in any refund transaction must be strictly greater than zero:
+\begin{equation}
+    \mathcal{I}_2: \quad A > 0, \quad A \in \mathbb{R}^+
+\end{equation}
+
+\subsection{Invariant 3: Maximum Safety Ceiling Invariant}
+The monetary amount $A$ must not exceed the enterprise safety ceiling $C_{\text{max}} = \$500.00$:
+\begin{equation}
+    \mathcal{I}_3: \quad A \le C_{\text{max}} = 500
+\end{equation}
+
+\subsection{Invariant 4: Temporal Cutoff Window Invariant}
+Let $t_{\text{epoch}}$ denote the frozen benchmark date (\texttt{2026-10-26}), and let $t_{\text{purchase}}(i)$ denote the purchase date of item $i$. An item is eligible for refund if and only if:
+\begin{equation}
+    \mathcal{I}_4: \quad (t_{\text{epoch}} - 30\text{ days}) \le t_{\text{purchase}}(i) \le t_{\text{epoch}}
+\end{equation}
+Any item where $t_{\text{purchase}}(i) < (t_{\text{epoch}} - 30\text{ days})$ (expired) or $t_{\text{purchase}}(i) > t_{\text{epoch}}$ (invalid future date) is strictly ineligible.
+
+\subsection{Invariant 5: Unrefunded Eligible Balance Invariant}
+Let $\mathcal{P}_{\text{unref}}(u)$ denote the set of purchased items for user $u$ with status $\texttt{PURCHASED}$. The refund amount $A$ must not exceed the sum of prices of eligible, unrefunded items:
+\begin{equation}
+    \mathcal{I}_5: \quad A \le \sum_{i \in \mathcal{P}_{\text{unref}}(u) \cap \text{Eligible}(t_{\text{epoch}})} \text{Price}(i)
+\end{equation}
+
+\subsection{Invariant 6: Idempotent Ticket Uniqueness Invariant}
+Let $\mathcal{K}$ denote the space of canonical SHA-256 idempotency keys. For any key $k \in \mathcal{K}$, the persistent database must contain at most one committed refund ticket:
+\begin{equation}
+    \mathcal{I}_6: \quad \forall k \in \mathcal{K}, \quad |\text{Tickets}(k)| \le 1
+\end{equation}
+
+\section{Hardware, Software and Development Environment}
+\label{sec:req_env}
+Table~\ref{tab:req_environment} summarizes the hardware, software, foundation model, and runtime configurations utilized across development, testing, and benchmark execution.
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{p{4.2cm}X}
+\toprule
+\textbf{System Parameter} & \textbf{Specification / Configuration} \\
+\midrule
+\textbf{Host Architecture} & x86\_64 Multicore Processor, 16 GB DDR4 RAM \\
+\textbf{Operating System} & Microsoft Windows 11 Enterprise (Build 22631) \\
+\textbf{Programming Language} & Python 3.12.10 (Standard CPython Runtime) \\
+\textbf{Foundation LLM} & \texttt{openai/gpt-oss-20b} (Open-weight 20B Mixture-of-Experts) \\
+\textbf{LLM Serving Infrastructure} & Groq LPU (Language Processing Unit) Inference Engine \\
+\textbf{Agent Orchestration} & LangGraph 0.2+, LangChain 1.4+, Pydantic v2 \\
+\textbf{Database Engine} & SQLite 3.45+ (Persistent disk storage, WAL journaling mode) \\
+\textbf{Structured Response Schema} & \texttt{ToolStrategy(Answer)} enforcing structured Pydantic models \\
+\textbf{Asynchronous Web Server} & FastAPI, Uvicorn (ASGI), Server-Sent Events (SSE) \\
+\textbf{Test Execution Harness} & Pytest 9.1+, AsyncIO, DeepEval 4.3+ (Auxiliary) \\
+\textbf{Frozen Temporal Epoch} & \texttt{BENCHMARK\_DATE="2026-10-26"} \\
+\bottomrule
+\end{tabularx}
+\caption{System specifications, software packages, and operational environment.}
+\label{tab:req_environment}
+\end{table}

@@ -1,0 +1,67 @@
+%% Chapter 1 — Introduction
+%% Humanized per SKILL.md + data-verified against:
+%%   clean_docs.jsonl = 52 lines, queries.jsonl = 100 lines, poisoned_docs.jsonl = 27 lines
+
+\section{Background and Motivation}
+
+Healthcare AI has moved faster than healthcare AI security. Hospitals and telehealth platforms now rely on LLM-based assistants to synthesise patient histories, interpret clinical guidelines, and support diagnostic decisions. The problem with raw LLMs is well-known: they hallucinate, and their training data has a cutoff date. The fix most teams reach for is \textbf{Retrieval-Augmented Generation (RAG)}.
+
+RAG grounds the model by querying a live external knowledge base --- typically a vector database like ChromaDB --- at inference time. Instead of relying entirely on parametric memory, the system retrieves the closest matching clinical guidelines and feeds them into the LLM's context window. The answer is more accurate. The sources are traceable. The hallucination rate drops.
+
+What RAG does not solve is \textit{who controls that knowledge base}. This is the \textbf{RAG Trust Paradox}: the model trusts retrieved content because the pipeline gives it no mechanism to doubt it. If an adversary can corrupt the knowledge base, the model will faithfully repeat the poisoned content with full apparent confidence. Unlike training-time poisoning --- which requires massive compute --- inference-time corpus poisoning requires as few as five injected documents to achieve a 90\% Attack Success Rate against a system holding millions of records \cite{poisonedrag2025}. That is an extremely low barrier.
+
+In a healthcare context, this is not a theoretical risk. A poisoned system could recommend a fatal drug dosage citing a document that looks identical to a genuine NHS guideline. It could leak an oncology report from Patient B's record when Patient A asks about cancer screening. It could follow instructions embedded inside a retrieved PDF to silently override its safety rules.
+
+\section{Problem Statement}
+
+\subsection{Rationale}
+
+Traditional LLM security focuses on the training phase or on sanitising what the user types in. In RAG systems, the trust boundary extends all the way into the document store and retrieval mechanism. A document that passes ingestion unchallenged becomes, from the model's perspective, authoritative fact.
+
+The clinical stakes raise the severity considerably. A security failure in this setting does not produce wrong search results. It produces wrong medical advice delivered with the same tone as correct advice.
+
+\subsection{Barriers}
+
+Several barriers make RAG difficult to secure:
+\begin{enumerate}
+    \item \textbf{Semantic indistinguishability:} Adversarial documents can be written to be nearly identical to legitimate clinical content. Keyword filters do not catch them because there are no suspicious keywords.
+    \item \textbf{Implicit LLM trust:} Foundation models are designed to follow instructions embedded in their context window. When those instructions arrive inside a retrieved document rather than the system prompt, the model cannot distinguish them. This is the ``Instruction-Data Confusion'' vulnerability.
+    \item \textbf{Multi-tenancy risks:} A shared vector database serving multiple patients or clinical roles will structurally leak restricted records if access control is not enforced at retrieval, not just at the application layer.
+    \item \textbf{Evaluation gap:} Most published benchmarks report a binary Attack Success Rate. That number tells you whether the attack worked but not how much contamination reached the model or how much clean context survived.
+\end{enumerate}
+
+\subsection{Research Gap}
+
+A review of security proceedings and academic databases from 2020 to April 2026 shows that the individual mechanisms --- knowledge poisoning, indirect prompt injection, cross-tenant leakage --- are each documented. What has not been published before this project is a system that addresses all three simultaneously on a \textit{healthcare-specific} corpus, with a retrieval-level metric beyond binary ASR, and an empirical evaluation across 100 benchmark queries. Specifically, no prior work combines:
+\begin{itemize}
+    \item A clinical knowledge base drawn exclusively from NHS, CDC, and WHO guidelines.
+    \item All three attack classes evaluated under the same controlled conditions.
+    \item A five-layer defence pipeline with RBAC enforced at the vector retrieval layer.
+    \item A novel retrieval integrity metric (CRIR) that operates without ground-truth labels.
+    \item A live interactive demonstration of the attack-defence contrast.
+\end{itemize}
+
+\section{Motivation and Project Objectives}
+
+The deployment of AI in healthcare is accelerating. The security rigour is not keeping pace. This project exists to close a specific part of that gap by building a system that can simulate attacks, measure their impact, and demonstrate that a practical defence-in-depth pipeline can meaningfully reduce retrieval contamination.
+
+The objectives are:
+\begin{enumerate}
+    \item Simulate three attack vectors against a realistic healthcare RAG system: Knowledge Poisoning, Indirect Prompt Injection, and Cross-Tenant Data Leakage.
+    \item Design and implement a five-layer defence architecture to mitigate all three.
+    \item Introduce the Context Retrieval Integrity Risk (CRIR) metric --- a three-component assessment comprising a binary contamination flag, retrieval precision under attack, and a composite risk score (0--100) incorporating contamination severity and response grounding --- as a more informative alternative to binary ASR.
+    \item Demonstrate the RAG Trust Paradox empirically through a controlled evaluation over three experimental conditions.
+    \item Build a Streamlit application that makes the vulnerability and its mitigation visible without requiring the viewer to read source code.
+\end{enumerate}
+
+\section{Scope of the Project}
+
+This project covers:
+\begin{itemize}
+    \item A healthcare knowledge base of \textbf{52 clean} medical documents and \textbf{27 adversarial} documents spanning all three attack classes.
+    \item Implementation in Python with ChromaDB (in-memory vector store), Sentence-Transformers (\texttt{all-MiniLM-L6-v2}), and Groq-hosted Llama 3.3 70B.
+    \item A controlled empirical evaluation across \textbf{100 benchmark queries} run under three independent conditions: clean, poisoned without defence, and poisoned with defence active.
+    \item A Streamlit interface supporting both a clinical assistant mode and a three-column attack demonstration mode.
+\end{itemize}
+
+The project does not cover production-grade HIPAA compliance certification, real patient data, multi-node deployment, or formal proof of defence completeness.

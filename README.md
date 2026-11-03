@@ -1,8 +1,32 @@
-# AgentSentinel: Enterprise Agent Evaluation & Policy Guardrail Framework
+# AgentSentinel: Enterprise Agent Evaluation & Policy Guardrail Harness
 
-AgentSentinel is an automated evaluation framework and regression testing harness for tool-calling LLM agents, built with **LangGraph**, **LangChain**, and **Confident AI DeepEval**.
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-ReAct%20Agent-orange.svg)](https://github.com/langchain-ai/langgraph)
+[![DeepEval](https://img.shields.io/badge/DeepEval-4.3+-purple.svg)](https://github.com/confident-ai/deepeval)
+[![Tests Passing](https://img.shields.io/badge/pytest-50%20passed-brightgreen.svg)](tests/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-The framework simulates an autonomous customer support refund specialist enforcing multi-variable business policies: customer identity lookup, 30-day cutoff validation, non-purchased item checks, and partial refund calculations. It decouples stochastic intent extraction from deterministic tool execution, verifying that agent actions remain strictly within corporate policy boundaries.
+**AgentSentinel** is an enterprise-grade evaluation harness, policy guardrail framework, and execution safety gateway for tool-calling autonomous LLM agents. Powered by **LangGraph**, **LangChain**, **Confident AI DeepEval**, and the **EffectGuard Execution Safety Gateway**, AgentSentinel bridges the critical gap between stochastic natural language reasoning and deterministic state-level safety in financial, retail, and enterprise workflows.
+
+---
+
+## Key Highlights & Innovations
+
+1. **State-Level Execution Safety (EffectGuard Gateway):**
+   - **Policy-as-Code (PAC):** Deterministic YAML business invariants enforced in code *before* tool execution, moving policy enforcement out of fragile prompts.
+   - **Deterministic SHA-256 Idempotency:** Cryptographic key generation over normalized payload arguments guarantees zero duplicate database mutations under network retries.
+   - **Write-Ahead Logging (WAL) & Verify-Before-Retry:** State recovery engine that prevents double payouts when distributed timeouts occur after a database commit (e.g. 504 Gateway Timeouts).
+2. **Claim-vs-Ledger Auditor:**
+   - Cryptographically audits natural language claims against SQLite database ground truth.
+   - Automatically detects and flags **Linguistic Hallucinations** (agent claims a refund was issued when none was committed) and **Ghost Mutations** (silent state changes without user disclosure).
+3. **Chaos Fault Injection Engine:**
+   - Simulates real-world distributed system anomalies: `drop_before_exec`, `timeout_after_commit`, and `server_error` to stress-test agent reliability under adverse conditions.
+4. **C0 to C4 Comparative Scientific Matrix:**
+   - Head-to-head empirical evaluation comparing naive unconstrained agents against guarded architectures across 5 distinct conditions under chaos.
+5. **Frozen Benchmark Epoch:**
+   - Freezes the temporal reference date (`BENCHMARK_DATE="2026-10-26"`) to eliminate benchmark decay from rolling calendar cutoffs.
+6. **50 Hermetic Pytest Unit & Integration Tests:**
+   - Comprehensive test suite covering temporal boundaries, metric calculations, fault recovery, idempotency caching, adversarial attacks, and matrix isolation.
 
 ---
 
@@ -59,113 +83,67 @@ Evaluation benchmark conducted across the complete 25-case Golden Dataset using 
 
 ---
 
+## Scientific Matrix: C0 to C4 Under Chaos Faults
+
+To quantify agent vulnerability under distributed infrastructure failures, we evaluated five conditions:
+
+| Condition | Prompting | In-Code Policy Guard | Idempotency & WAL | Fault Rate | Duplicate Tickets | Financial Loss |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **C0: Naive Baseline** | Standard Prompt | ❌ None | ❌ None | 50% Chaos | **Detected** | **Over-refunded** |
+| **C1: Prompt-Only** | Strict Defense Prompt | ❌ None | ❌ None | 50% Chaos | **Detected** | **Over-refunded** |
+| **C2: Policy-as-Code** | Standard Prompt | ✅ Deterministic PAC | ❌ None | 50% Chaos | **Detected (Retries)** | **Over-refunded** |
+| **C3: Idempotent Gateway** | Standard Prompt | ❌ None | ✅ SHA-256 Key Cache | 50% Chaos | **0 (Zero)** | **$0.00** |
+| **C4: Full EffectGuard** | Production Prompt | ✅ Deterministic PAC | ✅ WAL + Verify-Before-Retry | 50% Chaos | **0 (Zero)** | **$0.00 (Immune)** |
+
+### Core Finding
+> Prompt engineering alone (C1) and purely functional preconditions (C2) **cannot solve distributed network failure modes**. Only state-level idempotency and WAL verification (C3 & C4) eliminate duplicate transactions and prevent corporate financial loss.
+
+---
+
 ## System Architecture
 
 ```mermaid
 flowchart TD
-    subgraph Evaluation_Harness ["DeepEval Evaluation Suite"]
-        Dataset["Golden Dataset (25 Scenarios)<br/>5 Core Categories"]
-        JudgeModel["Evaluator Model: OpenAI OSS (20B on Groq)"]
-        Runner["Evaluation Engine (backend/eval_service.py)"]
-        
-        subgraph Core_Metrics ["Evaluation Telemetry"]
-            M1["Tool Correctness Metric"]
-            M2["Answer Correctness Metric"]
-            M3["Argument Correctness Metric"]
-            M4["Task Completion Metric"]
-        end
+    subgraph Client_Layer ["Client & Telemetry Layer"]
+        UserChat["Support Chat UI (:8001)"]
+        EvalDash["Evaluation Dashboard (:8002)"]
     end
 
-    subgraph Agent_Runtime ["Customer Support Agent (LangGraph ReAct)"]
-        AgentCore["Agent Graph: create_agent()"]
-        SystemPrompt["Policy Prompt (ReAct Workflow)"]
+    subgraph Agent_Core ["LangGraph ReAct Agent"]
+        AgentLoop["Agent ReAct Loop"]
+        PromptEngine["System Prompt & Tools Schema"]
         LLM["OpenAI OSS (20B on Groq)"]
-        Memory["InMemorySaver (Thread Checkpointing)"]
     end
 
-    subgraph Tools_And_Data ["Tools & In-Memory Store"]
-        T1["get_user_purchase_history"]
-        T2["get_today_date (Cutoff Calendar Engine)"]
-        T3["calculate_right_refund"]
-        T4["issue_refund_ticket"]
-        DB[("users_data (Mock Accounts)")]
+    subgraph EffectGuard_Gateway ["EffectGuard Execution Safety Gateway"]
+        PAC["Policy-as-Code Validator<br/>(policy.yaml)"]
+        Idempotency["Deterministic SHA-256<br/>Idempotency Engine"]
+        WAL["Write-Ahead Journal<br/>(Verify-Before-Retry)"]
+        FaultInjector["Chaos Fault Injector<br/>(Timeouts, 504s, 500s)"]
     end
 
-    Dataset --> Runner
-    Runner --> AgentCore
-    AgentCore --> SystemPrompt
-    AgentCore --> LLM
-    AgentCore --> Memory
-    AgentCore --> T1 & T2 & T3 & T4
-    T1 & T3 --> DB
+    subgraph Persistence ["Persistent State Layer"]
+        DB[("SQLite: store.db<br/>(users, purchases, refund_tickets)")]
+        Journal[("execution_journal Table")]
+    end
 
-    AgentCore --> Core_Metrics
-```
+    subgraph Audit_And_Eval ["Evaluation & Audit Harness"]
+        DeepEval["DeepEval Golden Suite (25 Cases)"]
+        ClaimAuditor["Claim-vs-Ledger Auditor<br/>(Diffs Text Claims vs DB State)"]
+        MatrixRunner["Scientific Matrix Runner (C0-C4)"]
+    end
 
----
-
-## Evaluation Taxonomy & Metrics
-
-### Evaluated Metrics
-
-| Metric | Type | Pass Threshold | Definition |
-| :--- | :--- | :--- | :--- |
-| **Tool Correctness** | Tool Metric | `0.80` | Measures whether the agent called the exact expected sequence of tools. |
-| **Answer Correctness** | Response Metric | `0.80` | Evaluates logical equivalence and policy outcome alignment against expected output. |
-| **Argument Correctness**| Parameter Metric | `0.75` | Verifies extracted parameters (usernames, items, amounts) against ground truth. |
-| **Task Completion** | End-to-End | `0.80` | Verifies the overarching business task was completely and safely fulfilled. |
-
-### Dataset Categories (25 Scenarios)
-
-1. **Happy Path Valid Refunds (Cases 1 to 7, 9):** Single and multi-item requests within the 30-day window.
-2. **Policy Boundaries & Calendar Precision (Cases 8, 10, 11, 25):** 30-day cutoff boundaries, expired purchases, and future date anomaly detection.
-3. **Partial Eligibility & Mixed States (Cases 12 to 16):** Requests containing combinations of eligible, expired, and unpurchased items.
-4. **Informational Inquiries (Cases 17 to 20):** Order history requests where no refund action should be taken.
-5. **Negative Guardrails (Cases 21 to 24):** Non-existent usernames and unpurchased items halting execution.
-
----
-
-## Production Dashboards
-
-The framework includes two independent, decoupled web interfaces:
-
-### 1. Support Chat Console (`http://127.0.0.1:8001`)
-* ReAct refund specialist agent powered by OpenAI OSS (20B).
-* GFM Markdown table rendering for order histories and refund summaries.
-* Session reset and thread checkpointing via LangGraph.
-
-### 2. Evaluation Dashboard (`http://127.0.0.1:8002`)
-* Server-Sent Events (SSE) live evaluation telemetry streaming.
-* Real-time metric gauges for Tool Correctness, Answer Correctness, Argument Correctness, and Task Completion.
-* Interactive case drawer modal for inspecting inputs, outputs, tool arguments, and execution latency.
-* One-click **Download Benchmark (CSV)** exporting UTF-8 BOM formatted spreadsheets.
-
----
-
-## Quick Start
-
-### 1. Installation
-```powershell
-uv venv
-.\.venv\Scripts\activate
-uv pip install -e .
-```
-
-### 2. Environment Configuration
-Create a `.env` file in the root directory (refer to `.env.example`):
-```env
-GROQ_API_KEY="your_groq_api_key_here"
-MODEL_Name="openai/gpt-oss-20b"
-```
-
-### 3. Launch Dashboards
-
-```powershell
-# Launch Customer Support Chat Console (Port 8001)
-python run_chat.py
-
-# Launch Evaluation Dashboard (Port 8002)
-python run_evals.py
+    UserChat <--> AgentLoop
+    AgentLoop <--> LLM
+    AgentLoop --> PAC
+    PAC -->|Allowed| Idempotency
+    PAC -->|Rejected| AgentLoop
+    Idempotency --> FaultInjector
+    FaultInjector --> WAL
+    WAL --> DB & Journal
+    AgentLoop --> ClaimAuditor
+    ClaimAuditor <--> DB
+    EvalDash <--> DeepEval & MatrixRunner
 ```
 
 ---
@@ -173,29 +151,129 @@ python run_evals.py
 ## Repository Structure
 
 ```text
-Agent_Eval/
-├── agent/                  # Agent core, ReAct tools, prompts, mock data
-│   ├── agent.py            # LangGraph create_agent definition
-│   ├── data.py             # Customer purchase database
-│   ├── models.py           # Model initialization
-│   ├── prompts.py          # Corporate refund policy instructions
-│   └── tools.py            # ReAct tools (history, date, calculate, ticket)
-├── backend/                # Decoupled FastAPI server services
-│   ├── chat_app.py         # Chat console API server (Port 8001)
-│   ├── chat_service.py     # Multi-turn chat session service
-│   ├── eval_app.py         # Evaluation dashboard API server (Port 8002)
-│   └── eval_service.py     # Live SSE benchmark telemetry engine
-├── evaluations/            # DeepEval testing suites & dataset
-│   ├── dataset.py          # 25 curated golden scenarios
-│   ├── model.py            # Model configuration
-│   └── eval_all.py         # CLI batch runner
-├── frontend/               # Production dashboard interfaces
-│   ├── chat/index.html     # Support chat console interface
-│   ├── eval/index.html     # Live evaluation dashboard interface
-│   ├── css/                # Tokenized CSS (Framer & Intercom design systems)
-│   └── js/                 # Dashboard telemetry controllers & CSV export
-├── run_chat.py             # Standalone runner for Port 8001
-├── run_evals.py            # Standalone runner for Port 8002
-├── agent_eval_benchmark_llama_2026-10-26_20-14-15.csv  # Benchmark artifact
-└── pyproject.toml          # Project package configuration
+AgentSentinel-Enterprise-Agent-Evaluation-Policy-Guardrail-Harness/
+├── .env.example                                      # Environment configuration template
+├── pyproject.toml                                    # UV package dependencies & script entry points
+├── uv.lock                                           # Hermetic lockfile
+├── README.md                                         # Primary project documentation & benchmark report
+├── STATUS_README.md                                  # Complete engineering status and roadmap
+├── store.db                                          # Persistent SQLite database seed
+├── run_chat.py                                       # Standalone runner for Support Chat (:8001)
+├── run_evals.py                                      # Standalone runner for Evaluation Dashboard (:8002)
+├── run_benchmark_matrix.py                           # CLI runner for C0-C4 matrix benchmarks
+├── analyze_results.py                                # Telemetry statistical analyzer
+├── agent_eval_benchmark_llama_2026-10-26_20-14-15.csv# 25-Case golden benchmark CSV
+│
+├── agent/                                            # Autonomous Agent Core
+│   ├── agent.py                                      # LangGraph agent graph & structured answer output
+│   ├── data.py                                       # Mock catalog & account baseline records
+│   ├── db.py                                         # SQLite persistence access layer
+│   ├── fault_injector.py                             # Chaos distributed failure injection engine
+│   ├── models.py                                     # Groq LLM client initializer
+│   ├── objects.py                                    # Pydantic structured schemas (ClaimedEffect, Answer)
+│   ├── prompts.py                                    # Corporate refund policy instructions
+│   └── tools.py                                      # ReAct tools wrapped by EffectGuard Gateway
+│
+├── effectguard/                                      # EffectGuard Safety Gateway Core
+│   ├── __init__.py                                   # Package exports
+│   ├── policy.yaml                                   # Declarative Policy-as-Code invariant specifications
+│   ├── policy_engine.py                              # Precondition evaluation engine
+│   ├── gateway.py                                    # SHA-256 Idempotency, WAL, Verify-Before-Retry
+│   ├── claim_auditor.py                              # Claim-vs-Ledger audit diff engine
+│   └── condition_runner.py                           # Scientific Matrix runner for C0-C4
+│
+├── backend/                                          # FastAPI Decoupled Microservices
+│   ├── chat_app.py                                   # Chat Console API & Static Serving (:8001)
+│   ├── chat_service.py                               # Multi-turn LangGraph session manager
+│   ├── eval_app.py                                   # Evaluation Dashboard API (:8002)
+│   └── eval_service.py                               # Live SSE telemetry runner with Claim Audits
+│
+├── evaluations/                                      # DeepEval Golden Evaluation Suite
+│   ├── dataset.py                                    # 25 Golden test scenarios across 5 categories
+│   ├── eval_all.py                                   # Batch evaluation script
+│   └── model.py                                      # DeepEval judge integration
+│
+├── frontend/                                         # Modern Dark-Mode Web Interfaces
+│   ├── chat/index.html                               # Customer support chat web console
+│   ├── eval/index.html                               # Live telemetry dashboard with C0-C4 Matrix runner
+│   ├── css/                                          # Tokenized design system stylesheets
+│   └── js/                                           # Dashboard telemetry controllers & CSV export
+│
+├── src/                                              # Package Sources
+│   └── agentsentinel/                                # Main package source root
+│       └── __init__.py                               # CLI entry point
+│
+└── tests/                                            # Hermetic Automated Pytest Suite (50 Tests)
+    ├── conftest.py                                   # hermetic test configuration & path injection
+    ├── test_frozen_clock.py                          # Clock freeze & 30-day cutoff boundaries
+    ├── test_eval_metrics.py                          # LCS tool sequence, argument & safety metrics
+    ├── test_partial_eligibility_fixes.py             # Mixed-item eligibility verification
+    ├── test_persistence_and_duplicates.py            # SQLite state mutations & idempotency
+    ├── test_phase1_database_and_faults.py            # Fault injection & C0 naive duplicate reproduction
+    ├── test_phase2_effectguard.py                    # Policy-as-Code & Verify-Before-Retry WAL
+    ├── test_phase3_adversarial.py                    # Claim Auditor & prompt injection defenses
+    └── test_phase4_matrix.py                         # C0-C4 Scientific Matrix execution
 ```
+
+---
+
+## Quick Start & Installation
+
+### 1. Prerequisites
+- Python 3.12+
+- [uv](https://github.com/astral-sh/uv) (recommended) or standard `pip`
+
+### 2. Environment Setup
+Clone the repository and install dependencies:
+```powershell
+# Clone the repository
+git clone https://github.com/SudeepKarthik30/AgentSentinel-Enterprise-Agent-Evaluation-Policy-Guardrail-Harness.git
+cd AgentSentinel-Enterprise-Agent-Evaluation-Policy-Guardrail-Harness
+
+# Sync virtual environment using uv
+uv sync --extra dev
+```
+
+### 3. API Key Configuration
+Copy `.env.example` to `.env` and provide your Groq API key:
+```powershell
+cp .env.example .env
+```
+Inside `.env`:
+```env
+GROQ_API_KEY="gsk_your_groq_api_key_here"
+LLAMA_MODEL="openai/gpt-oss-20b"
+BENCHMARK_DATE="2026-10-26"
+```
+
+### 4. Run the Full Test Suite
+Execute the 50 automated hermetic pytest suites:
+```powershell
+uv run pytest
+```
+Output:
+```text
+============================= 50 passed in 4.68s ==============================
+```
+
+### 5. Launch Dashboards
+
+Open two terminal windows:
+
+**Terminal 1 — Support Chat Console (Port 8001):**
+```powershell
+uv run python run_chat.py
+# Open http://127.0.0.1:8001 in your browser
+```
+
+**Terminal 2 — Evaluation & Safety Dashboard (Port 8002):**
+```powershell
+uv run python run_evals.py
+# Open http://127.0.0.1:8002 in your browser
+```
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

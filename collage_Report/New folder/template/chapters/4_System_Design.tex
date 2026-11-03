@@ -1,0 +1,379 @@
+\section{High-Level Architecture Overview}
+\label{sec:design_overview}
+The EffectGuard framework is designed as a modular, multi-layered systems architecture that decouples agent reasoning from transactional execution, business policy enforcement, and persistent state management. The overall system is organized into four distinct architectural layers, as visualized in Figure~\ref{fig:arch_layers}:
+\begin{enumerate}
+    \item \textbf{Layer 1: Autonomous Agent Runtime:} Manages natural language reasoning, dialogue history, and structured response generation using LangGraph and the Groq LPU inference engine.
+    \item \textbf{Layer 2: EffectGuard Execution Safety Gateway:} Intercepts tool calls at the runtime boundary, executing Policy-as-Code invariant verification, deterministic idempotency deduplication, write-ahead journaling, and Verify-Before-Retry recovery.
+    \item \textbf{Layer 3: Persistent Relational State Layer:} Maintains ACID-compliant relational storage using SQLite operating in Write-Ahead Logging (WAL) mode.
+    \item \textbf{Layer 4: Evaluation and Telemetry Layer (AgentSentinel):} Provides chaos fault injection, sequence-aware tool matching, frozen temporal anchoring, and claim-vs-ledger auditing.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1.1cm and 1.5cm,
+    layer/.style={draw=blue!70!black, fill=blue!5, rounded corners=6pt, inner sep=8pt, line width=1pt},
+    box/.style={draw=black!80, fill=white, rounded corners=3pt, align=center, font=\footnotesize, minimum height=0.75cm, line width=0.6pt},
+    arrow/.style={-{Latex[length=2.5mm]}, line width=1pt, draw=black!70}
+]
+
+% Layer 1: Agent Runtime
+\node[box, minimum width=3.2cm] (llm) {Groq LPU Engine\\(\texttt{openai/gpt-oss-20b})};
+\node[box, right=0.8cm of llm, minimum width=3.5cm] (langgraph) {LangGraph ReAct Agent\\State Graph + Checkpointer};
+\node[box, right=0.8cm of langgraph, minimum width=3cm] (schema) {Structured Output\\Adapter (\texttt{Answer})};
+
+\begin{scope}[on background layer]
+    \node[layer, fit=(llm) (langgraph) (schema), label={[font=\bfseries\small, text=blue!80!black]above:Layer 1: Autonomous Agent Runtime}] (l1) {};
+\end{scope}
+
+% Layer 2: EffectGuard Gateway
+\node[box, below=1.4cm of llm, minimum width=3cm] (classifier) {Tool Effect Classifier\\(Read-Only vs Mutating)};
+\node[box, below=1.4cm of langgraph, minimum width=3.5cm] (pac) {Policy-as-Code Engine\\(\texttt{policy.yaml} Invariants)};
+\node[box, below=1.4cm of schema, minimum width=3.2cm] (idemp) {SHA-256 Idempotency\\+ Verify-Before-Retry};
+
+\begin{scope}[on background layer]
+    \node[layer, fit=(classifier) (pac) (idemp), label={[font=\bfseries\small, text=blue!80!black]above:Layer 2: EffectGuard Execution Safety Gateway}] (l2) {};
+\end{scope}
+
+% Layer 3: Persistence Layer
+\node[box, below=1.4cm of classifier, minimum width=3.2cm] (users) {Users \& Catalog\\(\texttt{users}, \texttt{purchases})};
+\node[box, below=1.4cm of pac, minimum width=3.5cm] (tickets) {Financial Audit Ledger\\(\texttt{refund\_tickets})};
+\node[box, below=1.4cm of idemp, minimum width=3.2cm] (journal) {Write-Ahead Journal\\(\texttt{execution\_journal})};
+
+\begin{scope}[on background layer]
+    \node[layer, fit=(users) (tickets) (journal), label={[font=\bfseries\small, text=blue!80!black]above:Layer 3: Persistent Relational State Layer (SQLite WAL)}] (l3) {};
+\end{scope}
+
+% Layer 4: Evaluation Layer
+\node[box, below=1.4cm of users, minimum width=3.2cm] (chaos) {Chaos Fault Injector\\(504 Timeouts, Drops)};
+\node[box, below=1.4cm of tickets, minimum width=3.5cm] (auditor) {Claim-vs-Ledger Auditor\\(Diff \& Discrepancy Engine)};
+\node[box, below=1.4cm of journal, minimum width=3.2cm] (matrix) {Scientific Matrix Runner\\(C0 to C4 Ablation Suite)};
+
+\begin{scope}[on background layer]
+    \node[layer, fit=(chaos) (auditor) (matrix), label={[font=\bfseries\small, text=blue!80!black]above:Layer 4: Precision Evaluation \& Chaos Telemetry Layer (AgentSentinel)}] (l4) {};
+\end{scope}
+
+% Connections
+\draw[arrow] (langgraph) -- (classifier) node[midway, right, font=\tiny] {Tool Call};
+\draw[arrow] (classifier) -- (pac) node[midway, above, font=\tiny] {Mutating};
+\draw[arrow] (pac) -- (idemp) node[midway, above, font=\tiny] {Allowed};
+\draw[arrow] (idemp) -- (tickets) node[midway, right, font=\tiny] {Commit};
+\draw[arrow] (idemp) -- (journal) node[midway, right, font=\tiny] {WAL};
+\draw[arrow, dashed] (chaos) -- (classifier) node[midway, left, font=\tiny] {Inject Faults};
+\draw[arrow, dashed] (auditor) -- (tickets) node[midway, right, font=\tiny] {Audit Diff};
+
+\end{tikzpicture}
+\caption{Four-layer architectural blueprint of the EffectGuard framework.}
+\label{fig:arch_layers}
+\end{figure}
+
+\section{Autonomous Agent Engine}
+\label{sec:design_agent}
+The core reasoning engine is implemented using **LangGraph**~\cite{chase2022langchain}, establishing a cyclic state machine where model reasoning and tool executions alternate deterministically.
+
+\subsection{State Graph Topology and Cyclic Execution}
+The agent maintains an internal state object $\mathcal{S}_{\text{agent}} = \langle \mathcal{M}, \mathcal{R}_{\text{struct}} \rangle$, where $\mathcal{M}$ represents the sequence of conversational messages and $\mathcal{R}_{\text{struct}}$ represents the structured response object. The graph consists of two primary operational nodes:
+\begin{enumerate}
+    \item \textbf{Agent Node ($\mathcal{N}_{\text{agent}}$):} Invokes the foundation model (\texttt{openai/gpt-oss-20b}) with the system prompt, conversational history, and available tool definitions. The model produces either a sequence of tool calls or a final structured response.
+    \item \textbf{Action Node ($\mathcal{N}_{\text{tools}}$):} Dispatches tool calls requested by the agent through the EffectGuard gateway.
+\end{enumerate}
+
+State checkpointing is governed by LangGraph's \texttt{InMemorySaver}, which preserves thread execution checkpoints identified by a unique session UUID ($\text{thread\_id}$).
+
+\subsection{Structured Response Schema}
+To eliminate unstructured textual ambiguity, the agent outputs a structured Pydantic object defined via \texttt{ToolStrategy(Answer)}:
+\begin{lstlisting}[language=Python]
+class ClaimedEffect(BaseModel):
+    action: str  # e.g., 'issue_refund_ticket'
+    user: str    # e.g., 'sarah_m'
+    amount: float # e.g., 45.0
+    status: str  # 'SUCCESS' or 'FAILED'
+
+class Answer(BaseModel):
+    answer: str  # Customer-facing natural language response
+    conversation: bool  # False if request is fully resolved
+    claimed_effects: list[ClaimedEffect] = []
+\end{lstlisting}
+This schema forces the model to explicitly declare its intended state mutations, providing a structured foundation for the Claim-vs-Ledger Auditor.
+
+\section{EffectGuard Execution Safety Gateway: The Core Lifecycle}
+\label{sec:design_gateway}
+The core innovation of EffectGuard is the execution lifecycle enforced upon every tool invocation. Figure~\ref{fig:gateway_lifecycle} presents the complete state transition diagram executed by the gateway.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1.3cm and 2.0cm,
+    startstop/.style={draw=black, fill=gray!15, rectangle, rounded corners=4pt, font=\footnotesize\bfseries, minimum height=0.7cm, minimum width=2.5cm, line width=0.8pt},
+    decision/.style={draw=orange!80!black, fill=orange!10, diamond, aspect=2, font=\footnotesize\bfseries, align=center, line width=0.8pt},
+    process/.style={draw=blue!80!black, fill=blue!5, rectangle, rounded corners=3pt, font=\footnotesize, align=center, minimum height=0.75cm, minimum width=3.2cm, line width=0.8pt},
+    error/.style={draw=red!80!black, fill=red!10, rectangle, rounded corners=3pt, font=\footnotesize\bfseries, align=center, minimum height=0.75cm, minimum width=2.8cm, line width=0.8pt},
+    arrow/.style={-{Latex[length=2.5mm]}, line width=0.9pt, draw=black!80}
+]
+
+\node[startstop] (start) {Tool Invocation Request};
+\node[decision, below=0.9cm of start] (class_check) {Effect Class\\Irreversible?};
+\node[process, right=2.2cm of class_check] (passthrough) {Direct Raw Execution\\(Read-Only Passthrough)};
+\node[process, below=1.0cm of class_check] (hash_key) {Compute Canonical\\SHA-256 Idempotency Key};
+\node[decision, below=0.9cm of hash_key] (cache_check) {Idempotency Cache\\Hit in SQLite?};
+\node[process, right=2.2cm of cache_check] (cache_return) {Return Committed\\Receipt (Suppress Write)};
+\node[decision, below=1.0cm of cache_check] (policy_check) {Policy Preconditions\\Satisfied?};
+\node[error, right=2.2cm of policy_check] (policy_block) {Gateway Error:\\Blocked (Zero DB Mutation)};
+\node[process, below=1.0cm of policy_check] (wal_pending) {Write-Ahead Journal:\\Insert Status = 'PENDING'};
+\node[process, below=0.9cm of wal_pending] (raw_exec) {Invoke Raw Executor\\(Commit to Database)};
+\node[decision, below=0.9cm of raw_exec] (exec_result) {Execution\\Outcome?};
+\node[process, left=2.0cm of exec_result] (wal_commit) {Update Journal:\\Status = 'COMMITTED'};
+\node[process, right=2.0cm of exec_result] (verify_retry) {Verify-Before-Retry:\\Check DB for Key};
+\node[decision, below=1.1cm of verify_retry] (found_db) {Committed\\in DB?};
+\node[process, left=2.0cm of found_db] (recover_receipt) {Recover Receipt \&\\Log 'COMMITTED'};
+\node[process, below=1.0cm of found_db] (retry_once) {Retry Execution Once\\With Identical Key};
+
+% Connectors
+\draw[arrow] (start) -- (class_check);
+\draw[arrow] (class_check) -- node[above, font=\tiny] {No} (passthrough);
+\draw[arrow] (class_check) -- node[right, font=\tiny] {Yes} (hash_key);
+\draw[arrow] (hash_key) -- (cache_check);
+\draw[arrow] (cache_check) -- node[above, font=\tiny] {Yes} (cache_return);
+\draw[arrow] (cache_check) -- node[right, font=\tiny] {No} (policy_check);
+\draw[arrow] (policy_check) -- node[above, font=\tiny] {Fail} (policy_block);
+\draw[arrow] (policy_check) -- node[right, font=\tiny] {Pass} (wal_pending);
+\draw[arrow] (wal_pending) -- (raw_exec);
+\draw[arrow] (raw_exec) -- (exec_result);
+\draw[arrow] (exec_result) -- node[above, font=\tiny] {Success} (wal_commit);
+\draw[arrow] (exec_result) -- node[above, font=\tiny] {Timeout} (verify_retry);
+\draw[arrow] (verify_retry) -- (found_db);
+\draw[arrow] (found_db) -- node[above, font=\tiny] {Yes} (recover_receipt);
+\draw[arrow] (found_db) -- node[right, font=\tiny] {No} (retry_once);
+
+\end{tikzpicture}
+\caption{EffectGuard Execution Safety Gateway state machine lifecycle.}
+\label{fig:gateway_lifecycle}
+\end{figure}
+
+\section{Declarative Policy-as-Code (PAC) Architecture}
+\label{sec:design_pac}
+To guarantee that corporate governance invariants are never subject to LLM stochasticity or prompt-injection bypasses, EffectGuard establishes a **Policy-as-Code (PAC)** engine. Business rules are declared externally in a human-readable configuration (\texttt{policy.yaml}):
+
+\begin{lstlisting}[language=SQL]
+tools:
+  calculate_right_refund:
+    effect_class: "read_only"
+    preconditions: ["user_exists"]
+
+  issue_refund_ticket:
+    effect_class: "irreversible"
+    preconditions:
+      - "user_exists"
+      - "positive_amount"
+      - "within_safety_ceiling"
+      - "has_unrefunded_purchases"
+    max_amount_ceiling: 500
+    retry_policy:
+      max_retries: 2
+      verify_before_retry: true
+      require_idempotency: true
+\end{lstlisting}
+
+\subsection{Mathematical Invariant Verification Algorithm}
+When the gateway intercepts an irreversible tool invocation with arguments $\theta = \langle u, A \rangle$, the Policy Engine deterministically evaluates the predicates:
+\begin{align}
+    \mathcal{P}_{\text{user}}(u) &\equiv \exists \text{ row in } \texttt{users} \text{ where } \text{username} = u \\
+    \mathcal{P}_{\text{pos}}(A) &\equiv A > 0 \\
+    \mathcal{P}_{\text{ceil}}(A) &\equiv A \le C_{\text{max}} = 500 \\
+    \mathcal{P}_{\text{balance}}(u, A) &\equiv A \le \sum_{j \in \text{Unrefunded}(u) \cap \text{Eligible}(t_{\text{epoch}})} \text{Price}(j)
+\end{align}
+The execution gate evaluates the composite conjunction:
+\begin{equation}
+    \Phi(u, A) = \mathcal{P}_{\text{user}}(u) \land \mathcal{P}_{\text{pos}}(A) \land \mathcal{P}_{\text{ceil}}(A) \land \mathcal{P}_{\text{balance}}(u, A)
+\end{equation}
+If $\Phi(u, A) = \text{False}$, the gateway instantly terminates execution, raises a descriptive \texttt{EffectGuard Gateway Error}, and logs the rejection. Zero writes occur to the database.
+
+\section{Deterministic SHA-256 Idempotency Key Engine}
+\label{sec:design_idempotency}
+To prevent duplicate state mutations under network retries, EffectGuard implements a deterministic cryptographic idempotency engine.
+
+\subsection{Canonical JSON Serialization}
+In distributed HTTP and JSON-RPC environments, standard dictionary serialization is non-deterministic because key-value pairs may be ordered arbitrarily (e.g., \texttt{\{"user": "u1", "amount": 10\}} versus \texttt{\{"amount": 10, "user": "u1"\}}). To guarantee mathematical consistency, EffectGuard implements **Canonical Serialization**:
+\begin{enumerate}
+    \item \textbf{Username Normalization:} User strings are stripped and normalized (e.g., resolving \texttt{user\_123} to canonical \texttt{user123}).
+    \item \textbf{Lexicographical Key Sorting:} Key-value pairs are ordered lexicographically by key name.
+    \item \textbf{Deterministic String Canonicalization:} Whitespace is eliminated to form a minimal byte string $\mathcal{C}(\theta)$.
+\end{enumerate}
+
+\subsection{Mathematical Formulation}
+The idempotency key $k \in \{0, 1\}^{256}$ is computed as:
+\begin{equation}
+    k = \text{SHA-256}\Big(\tau_{\text{thread}} \parallel ``:" \parallel T_{\text{name}} \parallel ``:" \parallel \mathcal{C}(\theta)\Big)
+\end{equation}
+where $\tau_{\text{thread}}$ is the immutable session UUID, $T_{\text{name}}$ is the tool identifier, and $\parallel$ denotes string concatenation.
+
+\subsection{Collision Resistance Analysis}
+The SHA-256 cryptographic hash function maps arbitrary byte inputs to a 256-bit hash value space ($2^{256} \approx 1.15 \times 10^{77}$ possible keys). By the Birthday Paradox, the probability of a collision after generating $N$ keys is bounded by:
+\begin{equation}
+    P(\text{Collision}) \approx \frac{N^2}{2 \times 2^{256}} = \frac{N^2}{2^{257}}
+\end{equation}
+Even if an enterprise agent processes $10^9$ transactions per day, the probability of a collision is less than $10^{-59}$, providing mathematically absolute protection against accidental key collision across disjoint requests.
+
+\section{Write-Ahead Logging and Verify-Before-Retry Sequence}
+\label{sec:design_wal}
+To resolve the distributed commit-timeout dilemma, EffectGuard combines **Write-Ahead Logging (WAL)** with a **Verify-Before-Retry** recovery protocol. Figure~\ref{fig:wal_sequence} depicts the sequence diagram of an agent recovering from a transient HTTP 504 post-commit drop.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    scale=0.9, every node/.style={transform shape},
+    lifeline/.style={draw=black!60, dashed, line width=0.8pt},
+    participant/.style={draw=blue!80!black, fill=blue!10, rounded corners=3pt, font=\small\bfseries, minimum height=0.7cm, minimum width=2.5cm, line width=0.8pt},
+    msg/.style={-{Latex[length=2.5mm]}, line width=0.8pt, draw=black!80},
+    fault/.style={-{Latex[length=2.5mm]}, line width=1pt, draw=red!80!black, dashed}
+]
+
+% Participants
+\node[participant] (agent) at (0, 0) {ReAct Agent};
+\node[participant] (gw) at (4.5, 0) {EffectGuard Gateway};
+\node[participant] (journal) at (9.0, 0) {SQLite Journal (WAL)};
+\node[participant] (db) at (13.5, 0) {SQLite Database};
+
+% Lifelines
+\draw[lifeline] (agent) -- (0, -9.5);
+\draw[lifeline] (gw) -- (4.5, -9.5);
+\draw[lifeline] (journal) -- (9.0, -9.5);
+\draw[lifeline] (db) -- (13.5, -9.5);
+
+% Sequence
+\draw[msg] (agent) -- node[above, font=\scriptsize] {1. \texttt{issue\_refund\_ticket(sarah\_m, \$70)}} (gw);
+\draw[msg] (gw) -- node[above, font=\scriptsize] {2. Insert Status = 'PENDING'} (journal);
+\draw[msg] (gw) -- node[above, font=\scriptsize] {3. Insert Ticket (TICK-7A9B, \$70)} (db);
+\draw[msg] (db) -- node[above, font=\scriptsize] {4. Commit Confirmed (Ticket ID)} (gw);
+
+% Simulated Fault
+\node[draw=red, fill=red!10, text=red!80!black, font=\scriptsize\bfseries, inner sep=4pt, rounded corners=2pt] at (2.25, -4.2) {CHAOS: Socket Drops / 504 Timeout};
+\draw[fault] (gw) -- node[above, font=\scriptsize, text=red!80!black] {5. Exception: \texttt{TimeoutError}} (gw);
+
+% Recovery Protocol
+\node[draw=blue!80!black, fill=blue!5, font=\scriptsize\bfseries, inner sep=3pt] at (4.5, -5.2) {Initiate Verify-Before-Retry};
+\draw[msg] (gw) -- node[above, font=\scriptsize] {6. Lookup Ticket by Key: $k$} (db);
+\draw[msg] (db) -- node[above, font=\scriptsize] {7. Return Committed Row (TICK-7A9B)} (gw);
+\draw[msg] (gw) -- node[above, font=\scriptsize] {8. Update Status = 'COMMITTED'} (journal);
+\draw[msg] (gw) -- node[above, font=\scriptsize] {9. Return Success Receipt (TICK-7A9B, \$70)} (agent);
+
+% Note on Agent
+\node[draw=green!60!black, fill=green!10, font=\scriptsize, align=center, rounded corners=2pt] at (0, -8.2) {Agent Receives Valid\\Receipt! Zero Retries\\Zero Duplicate Writes};
+
+\end{tikzpicture}
+\caption{Sequence diagram illustrating EffectGuard's Verify-Before-Retry recovery under a post-commit network timeout.}
+\label{fig:wal_sequence}
+\end{figure}
+
+\section{Claim-vs-Ledger Auditor: Mathematical Formalism}
+\label{sec:design_auditor}
+To systematically eliminate hallucinations between agent claims and physical storage, we formalize the **Claim-vs-Ledger Auditor**.
+
+\subsection{Formal Definitions}
+Let $\mathcal{A}_{\text{claim}}$ denote the structured and unstructured assertions made by the agent regarding executed transactions, and let $\mathcal{T}_{\text{ledger}}$ denote the set of committed refund tickets in the persistent database:
+\begin{align}
+    \mathcal{C}_{\text{tickets}} &= |\mathcal{A}_{\text{claim}}| \in \mathbb{N}_0, \quad &\mathcal{C}_{\text{amount}} &= \sum_{c \in \mathcal{A}_{\text{claim}}} \text{Amount}(c) \\
+    \mathcal{L}_{\text{tickets}} &= |\mathcal{T}_{\text{ledger}}| \in \mathbb{N}_0, \quad &\mathcal{L}_{\text{amount}} &= \sum_{t \in \mathcal{T}_{\text{ledger}}} \text{Amount}(t)
+\end{align}
+
+\subsection{Discrepancy Taxonomy}
+The Claim Auditor classifies the execution into one of four mutually exclusive states:
+\begin{enumerate}
+    \item \textbf{Case A: False Claim (Linguistic Hallucination):}
+    \begin{equation}
+        \mathcal{C}_{\text{tickets}} > 0 \quad \land \quad \mathcal{L}_{\text{tickets}} = 0 \implies \textbf{FALSE\_CLAIM}
+    \end{equation}
+    The agent assured the customer that a payout occurred, but zero records exist on disk.
+    
+    \item \textbf{Case B: Ghost Mutation (Silent Side-Effect):}
+    \begin{equation}
+        \mathcal{C}_{\text{tickets}} = 0 \quad \land \quad \mathcal{L}_{\text{tickets}} > 0 \implies \textbf{GHOST\_MUTATION}
+    \end{equation}
+    The database state was modified, but the agent informed the customer that the operation failed.
+    
+    \item \textbf{Case C: Amount Drift (Monetary Discrepancy):}
+    \begin{equation}
+        \mathcal{C}_{\text{tickets}} > 0 \quad \land \quad \mathcal{L}_{\text{tickets}} > 0 \quad \land \quad |\mathcal{C}_{\text{amount}} - \mathcal{L}_{\text{amount}}| > 0.01 \implies \textbf{AMOUNT\_DRIFT}
+    \end{equation}
+    The agent stated a dollar amount that diverges from the physical ledger transaction.
+    
+    \item \textbf{Case D: Verified State Agreement:}
+    \begin{equation}
+        (\mathcal{C}_{\text{tickets}} = \mathcal{L}_{\text{tickets}}) \land (|\mathcal{C}_{\text{amount}} - \mathcal{L}_{\text{amount}}| \le 0.01) \implies \textbf{AUDIT\_PASSED}
+    \end{equation}
+\end{enumerate}
+
+\section{Persistent Relational Database Architecture}
+\label{sec:design_database}
+The persistence layer (\texttt{store.db}) is implemented in SQLite 3, utilizing foreign keys, index structures, and Write-Ahead Logging to guarantee transaction isolation. Figure~\ref{fig:er_diagram} displays the Entity-Relationship diagram.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1.5cm and 2.5cm,
+    entity/.style={draw=blue!80!black, fill=blue!5, rectangle, rounded corners=3pt, font=\small\bfseries, minimum height=0.8cm, line width=0.8pt},
+    tablebox/.style={draw=black!70, fill=white, rectangle, rounded corners=2pt, font=\scriptsize\ttfamily, align=left, inner sep=6pt, line width=0.6pt},
+    rel/.style={draw=black!70, line width=0.8pt}
+]
+
+% Table 1: users
+\node[tablebox] (users) {
+    \textbf{\textcolor{blue!80!black}{users}} \\
+    \hline
+    username (PK) : TEXT \\
+    created\_at : TEXT
+};
+
+% Table 2: purchases
+\node[tablebox, right=2.0cm of users] (purchases) {
+    \textbf{\textcolor{blue!80!black}{purchases}} \\
+    \hline
+    id (PK) : INTEGER \\
+    username (FK) : TEXT \\
+    item\_name : TEXT \\
+    price : REAL \\
+    purchase\_date : TEXT \\
+    status : TEXT ('PURCHASED', 'REFUNDED') \\
+    refund\_ticket\_id (FK) : TEXT \\
+    refunded\_at : TEXT
+};
+
+% Table 3: refund_tickets
+\node[tablebox, below=1.8cm of users] (tickets) {
+    \textbf{\textcolor{blue!80!black}{refund\_tickets}} \\
+    \hline
+    ticket\_id (PK) : TEXT \\
+    username (FK) : TEXT \\
+    amount : REAL \\
+    status : TEXT ('ISSUED') \\
+    idempotency\_key (UNIQUE) : TEXT \\
+    created\_at : TEXT
+};
+
+% Table 4: execution_journal
+\node[tablebox, below=1.8cm of purchases] (journal) {
+    \textbf{\textcolor{blue!80!black}{execution\_journal}} \\
+    \hline
+    journal\_id (PK) : TEXT \\
+    thread\_id : TEXT \\
+    idempotency\_key (UNIQUE) : TEXT \\
+    tool\_name : TEXT \\
+    args\_json : TEXT \\
+    status : TEXT ('PENDING', 'COMMITTED', 'FAILED') \\
+    result\_text : TEXT \\
+    created\_at : TEXT \\
+    updated\_at : TEXT
+};
+
+% Relationships
+\draw[rel] (users.east) -- node[above, font=\tiny] {1 : N} (purchases.west);
+\draw[rel] (users.south) -- node[left, font=\tiny] {1 : N} (tickets.north);
+\draw[rel] (tickets.east) -- node[above, font=\tiny] {1 : N (Links Items)} (purchases.south west);
+\draw[rel, dashed] (journal.west) -- node[above, font=\tiny] {Keys Match} (tickets.east);
+
+\end{tikzpicture}
+\caption{Relational Entity-Relationship diagram for persistent storage in \texttt{store.db}.}
+\label{fig:er_diagram}
+\end{figure}
+
+A critical production-hardening feature implemented in this design is **Item-Level Refund Tracking**: when a ticket is committed, the affected rows in \texttt{purchases} are permanently updated to $\texttt{status} = \texttt{'REFUNDED'}$ and linked to the unique \texttt{ticket\_id}. This prevents customers from issuing repeat refunds across conversation resets.

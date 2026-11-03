@@ -1,0 +1,208 @@
+\documentclass[a4paper, 11pt, oneside]{report} 
+
+\newcommand{\plogo}{\fbox{$\mathcal{PL}$}} 
+\usepackage{graphicx}
+\usepackage{graphics}
+\usepackage{float}
+\usepackage[table,xcdraw]{xcolor}
+\usepackage[utf8]{inputenc} 
+\usepackage[T1]{fontenc} 
+\usepackage{fouriernc} 
+\usepackage{subcaption}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{graphics}
+\usepackage{longtable}
+\usepackage[nottoc]{tocbibind}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{lipsum}
+\usepackage{colortbl}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric}
+\pgfplotsset{compat=1.18}
+\setlength{\arrayrulewidth}{0.5pt}
+\renewcommand{\arraystretch}{1.25}
+%% Centre all longtables globally
+\setlength{\LTleft}{\fill}
+\setlength{\LTright}{\fill}
+\begin{document} 	
+	\begin{titlepage} 
+		
+		\centering 
+		
+		\vspace*{\baselineskip} 
+		
+		\vspace{0.75\baselineskip}
+
+\begin{center}
+{\LARGE \textbf{MediCare Secure RAG}}
+
+\vspace{0.4em}
+
+{\normalsize\normalfont
+A Defense-in-Depth Framework for Knowledge Poisoning, Prompt Injection,\\[2pt]
+and Cross-Tenant Data Leakage in Healthcare RAG Systems
+}
+\end{center}
+
+
+		\vspace{0.75\baselineskip}
+		
+		\vspace{2\baselineskip}
+
+		A report submitted for the course named Project - I (CS3201)
+		
+		\vspace*{7\baselineskip}
+		
+		Submitted By
+		
+		\vspace{0.5\baselineskip}
+		
+		{\scshape\Large THIRUMALASETTY KARTHIK \\ SEMESTER  VI \\ 230101007}
+		
+		\vspace{0.5\baselineskip}
+		
+		Supervised By
+		
+		\vspace{0.5\baselineskip}
+		
+		{\scshape\Large Dr TERESSA LONGJAM}
+		
+		\vspace{0.5\baselineskip}
+		
+		\vfill
+		
+		\begin{center}
+			\includegraphics[width=5cm]{report_file/iiit manipur.png}
+		\end{center}
+	
+	{\scshape\small Department of Computer Science and Engineering\\ Indian Institute of Information Technology Senapati, Manipur \\ MAY, 2026}
+	
+\end{titlepage}
+
+%----------------------------------------------------------------------------------------
+
+% \begin{center}
+\begin{center}
+   { \LARGE \textbf{Declaration}}
+\end{center}
+In this submission, I have expressed my idea in my own words, and I have adequately cited
+and referenced any ideas or words that were taken from another source. I also declare that I
+adhere to all principles of academic honesty and integrity and that I have not misrepresented
+or falsified any ideas, data, facts, or sources in this submission. If any violation of the above is
+made, I understand that the institute may take disciplinary action. Such a violation may also
+engender disciplinary action from the sources which were not properly cited or permission
+not taken when needed
+
+\vspace{1cm}
+
+\begin{flushright}
+{\small THIRUMALASETTY KARTHIK} \\
+\vspace{0.3cm}
+230101007
+\end{flushright}
+
+\vspace{1cm}
+
+DATE:\newpage
+\thispagestyle{empty}
+
+% ===== HEADER (Logo + Text Side-by-Side) =====
+\begin{center}
+\begin{tabular}{c l}
+\includegraphics[scale=0.2]{report_file/iiit manipur.png} &
+\begin{tabular}[c]{l}
+Department of Computer Science and Engineering \\
+Indian Institute of Information Technology Senapati, Manipur
+\end{tabular}
+\end{tabular}
+\end{center}
+
+\vspace{0.3cm}
+\par\noindent\rule{\textwidth}{0.4pt}
+
+{\small
+TERESSA LONGJAM \hfill Email: \href{mailto:teressa@iiitmanipur.ac.in}{teressa@iiitmanipur.ac.in}\\
+Assistant Professor, CSE, IIIT Manipur \hfill Contact No: +91 8131880113
+}
+
+\vspace{1.2cm}
+
+\begin{center}
+{\Huge \textbf{\emph{To Whom It May Concern}}}
+
+\vspace{1.2cm}
+
+\linespread{1.1}
+\large
+This is to certify that the project report entitled 
+\textbf{``MediCare Secure RAG: A Defense-in-Depth Framework for Knowledge Poisoning, Prompt Injection, and Cross-Tenant Data Leakage in Healthcare RAG Systems",}
+submitted to the department of Computer Science and Engineering, Indian Institute of Information Technology Senapati, Manipur in partial fulfilment for the award of degree of Bachelor of Technology in Computer Science and Engineering is a record of bonafide work carried out by \textbf{Thirumalasetty Karthik} bearing roll number 230101007 for the course Project I (CS3201).
+\end{center}
+
+\vspace{0.8cm}
+
+% ===== SUPERVISOR SIGN =====
+\begin{flushright}
+\large Signature of Supervisor\\[0.2cm]
+\textbf{(TERESSA LONGJAM)}
+\end{flushright}
+
+\vspace{1cm}
+
+% ===== EXAMINER SIGNATURES (Reduced Dots, Clean) =====
+\noindent Signature of the Examiner 1 \hspace{0.1cm}\makebox[3cm]{\dotfill}\\[0.3cm]
+\noindent Signature of the Examiner 2 \hspace{0.1cm}\makebox[3cm]{\dotfill}\\[0.3cm]
+\noindent Signature of the Examiner 3 \hspace{0.1cm}\makebox[3cm]{\dotfill}\\[0.3cm]
+\noindent Signature of the Examiner 4 \hspace{0.1cm}\makebox[3cm]{\dotfill}
+
+\begin{abstract}
+Healthcare systems are increasingly integrating Large Language Model (LLM)-based Retrieval-Augmented Generation (RAG) pipelines for clinical decision support. However, this integration exposes a critical vulnerability: the \textbf{RAG Trust Paradox}, wherein the LLM implicitly trusts all retrieved context including adversarially injected content. This project presents \textbf{MediCare Secure RAG}, a defense-in-depth framework that simulates and mitigates three primary attack vectors -- Knowledge Poisoning, Indirect Prompt Injection, and Cross-Tenant Data Leakage -- against a curated healthcare knowledge base. A five-layer security pipeline (Ingestion Sanitization, RBAC at Retrieval, Prompt Hardening, Output Monitoring, and Embedding Anomaly Detection) is evaluated over 100 queries across three experimental conditions. Results demonstrate a \textbf{44.4\% reduction} in the Context Retrieval Integrity Risk (CRIR) --- a three-component retrieval integrity assessment comprising a binary contamination flag, retrieval precision, and a composite risk score --- reducing the attack-affected query ratio from 90\% to 50\%, with a live Streamlit demo visualizing the attack-defense contrast in real time.
+\end{abstract}
+
+\pagebreak
+	
+\begin{center}
+    {\LARGE \textbf{Acknowledgement}}
+\end{center}
+\vspace{1.5cm}
+
+I am grateful to my project supervisor, Teressa Longjam, for her constant guidance and insightful direction in the development of MediCare Secure RAG. Her expertise in Artificial Intelligence and her constructive feedback throughout the development process were instrumental in shaping both the architecture and the evaluation methodology of this project. Her encouragement motivated me to tackle the more challenging aspects of the system, particularly the five-layer anti-poisoning architecture, the robust role-based access control engine, and the production deployment constraints on free-tier cloud infrastructure.
+
+I would also like to thank my peers at IIIT Manipur for their valuable discussions and feedback during the development and testing phases of this project.
+
+\vspace{1.5cm}
+
+\begin{flushright}
+    Thirumalasetty Karthik
+\end{flushright}
+
+	\vspace{1cm}
+	
+	\tableofcontents
+	\listoffigures
+        \listoftables
+	\chapter{Introduction}
+	\input{chapters/1_Introduction}
+        \chapter{Literature Survey}
+        \input{chapters/2_Literature_Survey}
+        \chapter{Requirement Engineering}
+        \input{chapters/3_Requirement}
+        \chapter{System Design}
+        \input{chapters/4_System_Design}
+        \chapter{Implementation}
+        \input{chapters/5_Implementation}
+        \chapter{Results and Discussion}
+        \input{chapters/6_Results}
+        \chapter{Conclusion and Future Work}
+        \input{chapters/7_Conclusion}
+        
+        \bibliography{report}
+	\bibliographystyle{plain}
+        
+	
+	
+	
+	
+\end{document}

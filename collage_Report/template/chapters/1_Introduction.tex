@@ -1,0 +1,91 @@
+%% Chapter 1 — Introduction
+%% Adapted to EffectGuard Project per IIIT Manipur CS4202 Guidelines
+
+\section{Background and Context}
+
+In recent years, artificial intelligence has taken a massive leap forward. Large Language Models (LLMs) are no longer just passive chatbots answering general questions; they are rapidly becoming autonomous operational agents. Rather than merely generating text, modern AI agents are actively connected to external tools, APIs, and relational databases. In real-world enterprise environments, these agents are entrusted with practical tasks such as answering customer support inquiries, checking order histories, calculating return balances, and issuing financial refunds.
+
+The standard way to build these systems is using the \textbf{ReAct (Reasoning and Acting)} loop \cite{yao2022react}. In a ReAct workflow, the language model alternates between thinking about a problem in natural language, selecting a software tool to call, and reading the output of that tool to plan its next move. For an online store, an agent might look up a customer's order history, check whether their purchase meets the store's 30-day return policy, calculate the exact refund amount, and write a permanent confirmation ticket to the store's financial database.
+
+However, moving an AI agent from simple conversation to real-world database execution introduces a serious, overlooked danger: the \textbf{Agent Execution-State Paradox}. In traditional enterprise software, developers write strict backend rules to protect databases and financial ledgers. We use transactions, database constraints, and deterministic logic to ensure that money is never deducted twice and records are never corrupted. 
+
+In contrast, typical AI agent systems hand over all execution authority directly to the language model itself. While language models are remarkably articulate, they have no built-in understanding of database consistency or distributed network failures. When an AI agent talks to an actual database across a real network, conversational fluency alone is not enough to ensure safety.
+
+\section{Motivation: The Real-World Disconnect}
+
+Today, almost every popular benchmark for evaluating AI agents looks only at the text the agent generates. If an AI agent replies to a customer with an articulate and polite message:
+\begin{center}
+    \textit{``I have verified your purchase and successfully processed a full refund of Rs.~70.00 for your Ergonomic Office Chair,''}
+\end{center}
+conventional linguistic benchmarks will give the agent a perfect score.
+
+Yet, this evaluation is completely blind to what actually happened to the real database. In practice, three dangerous discrepancies occur regularly:
+
+\begin{enumerate}
+    \item \textbf{Talking without Acting (False Claims):} The AI sounds completely confident and says the refund was processed, but it never actually called the database tool, or the tool crashed silently. The customer leaves happy thinking their money is coming, but the company ledger shows zero records.
+    
+    \item \textbf{Silent Changes without Disclosure (Ghost Mutations):} The AI calls the database tool and permanently issues a refund, but then hits a parsing error or word limit when formulating its final reply. It ends up apologizing to the customer (saying \textit{``An unexpected error occurred''}), while the database was already altered behind the scenes. This breaks financial accounting and auditability.
+    
+    \item \textbf{The Network Timeout Dilemma (Duplicate Payouts):} In cloud networks, connections occasionally drop. When an agent calls a database tool to issue a refund ticket, the database might save the record successfully, but a temporary network drop (an HTTP 504 Gateway Timeout) prevents the confirmation message from reaching the agent. Standard agents assume the request failed and immediately retry it. Because the agent retries blindly, the database commits a second, third, or fourth ticket, resulting in direct financial loss.
+\end{enumerate}
+
+In any real business, conversational politeness is meaningless if the system loses money or corrupts records. An autonomous agent that makes false claims, silences database updates, or doubles payouts creates direct monetary loss, audit failures, and customer frustration.
+
+\section{Problem Statement and Practical Challenges}
+
+\subsection{Core Problem}
+
+When an autonomous agent interacts with persistent databases over real-world networks, three essential safety conditions must be guaranteed:
+\begin{enumerate}
+    \item \textbf{Business Policy Compliance:} The agent must never execute a refund unless the customer is registered, the requested amount is positive, within safety limits (e.g., maximum Rs.~500.00 per ticket), and eligible under store return rules.
+    \item \textbf{Strict Idempotency (Single Execution):} Even if the network drops or the tool times out, retrying an operation must never create duplicate tickets or disburse duplicate funds.
+    \item \textbf{Claim-vs-Ledger Alignment:} What the agent promises in chat must always match exactly what was committed to the physical database.
+\end{enumerate}
+
+Under standard agent frameworks, all three guarantees fail because developers rely on the AI's system prompt to enforce rules, and standard retry loops lack transactional awareness.
+
+\subsection{Practical Engineering Challenges}
+
+Building a reliable execution boundary for autonomous agents presents several practical hurdles:
+\begin{itemize}
+    \item \textbf{Prompt Injections and Model Drift:} If business rules (like return windows and refund limits) are written as English sentences in the system prompt, clever customer prompts or unexpected model phrasing can bypass them.
+    \item \textbf{Non-Deterministic Retries:} Language models do not repeat themselves identically. When retrying an action, the agent might rephrase arguments or reorder parameters, which breaks standard deduplication caches.
+    \item \textbf{Unreliable Networks:} A dropped network connection looks identical to an execution failure. Without inspecting the persistent database, an agent cannot know whether the server never received the request or whether the record was saved and only the return receipt was lost.
+    \item \textbf{Lack of State-Level Testing:} Most existing agent benchmarks test agents in clean, simulated setups with 0\% network drops. They never test what happens when sockets disconnect right after a commit.
+\end{itemize}
+
+\section{Project Objectives}
+
+To solve these challenges and guarantee transactional safety, this project establishes five clear engineering objectives:
+
+\begin{enumerate}
+    \item \textbf{Build the EffectGuard Execution Gateway:} Design a lightweight middleware that sits between the AI agent and the database. It lets read-only queries pass through instantly with zero delay, but intercepts mutating actions (like issuing refunds) to enforce business rules in deterministic code outside the prompt.
+    \item \textbf{Create a Cryptographic Idempotency and Write-Ahead Log Engine:} Implement a standardized hashing system that produces identical keys across retries, combined with a persistent write-ahead journal to track each operation's lifecycle (\texttt{PENDING}, \texttt{COMMITTED}, \texttt{FAILED}).
+    \item \textbf{Implement the Verify-Before-Retry Recovery Protocol:} Develop an automated recovery mechanism that catches network timeouts. Instead of retrying blindly, it queries the database first using the operation's unique key, finds the committed record if it exists, and returns the confirmed receipt directly.
+    \item \textbf{Develop the Claim-vs-Ledger Auditor:} Build an automated verification engine that compares the agent's textual chat responses against physical database records, catching False Claims, Ghost Mutations, and monetary discrepancies.
+    \item \textbf{Evaluate System Resilience with AgentSentinel:} Create a hermetic testing environment with a frozen calendar date (\texttt{2026-10-26}) and active chaos fault injection (20\% and 35\% network dropouts) to compare standard agent behaviors against EffectGuard across 25 real-world test cases.
+\end{enumerate}
+
+\section{Summary of Genuine Contributions}
+
+This work provides concrete, verified contributions to the practical deployment of autonomous agents:
+
+\begin{itemize}
+    \item \textbf{A Practical Execution Gateway Architecture:} A five-layer boundary (Tool Effect Classification, Policy-as-Code Preconditions, SHA-256 Idempotency Keying, Write-Ahead Journaling, and Claim-vs-Ledger Auditing) that decouples business rules from plain-text prompts.
+    \item \textbf{Zero Duplicate Payouts Under Network Turbulence:} We demonstrate experimentally that while naive agents double-spend funds (losing over Rs.~125.00 in a 25-case evaluation) under network timeouts, EffectGuard guarantees \textbf{zero duplicate tickets and Rs.~0.00 financial loss}.
+    \item \textbf{Faster Recovery without Token Waste:} By resolving timeouts in deterministic code via local database lookups (taking under 1\,ms) rather than waiting for multi-turn LLM reasoning loops, EffectGuard reduces overall task latency by \textbf{75.7\%} (from 47.1\,s down to 11.5\,s).
+    \item \textbf{Ground-Truth Independent Text-to-Ledger Verification:} An automated auditing mechanism that confirms whether what the AI said matches what the database recorded, without requiring manual grading.
+    \item \textbf{Comprehensive Chaos-Tested Benchmark:} A detailed evaluation across five operational categories, showing that EffectGuard achieves \textbf{100\% valid refund fulfillment} under aggressive network dropouts where standard agents abandon requests.
+\end{itemize}
+
+\section{Organization of the Report}
+
+The remainder of this report is organized as follows:
+\begin{itemize}
+    \item \textbf{Chapter 2 (Literature Survey):} Reviews previous work in tool-calling agents, conversational safety guardrails, distributed systems transaction theory, and existing benchmarks, highlighting the exact gaps EffectGuard addresses.
+    \item \textbf{Chapter 3 (Requirement Engineering):} Outlines the customer support domain, user personas, functional requirements (FR-01 to FR-08), non-functional requirements (NFR-01 to NFR-06), and use case models.
+    \item \textbf{Chapter 4 (System Design):} Details the architecture of EffectGuard, tool specifications, the Five-Layer Gateway decision flow, relational schema design, sequence diagrams, user interfaces, and evaluation metrics.
+    \item \textbf{Chapter 5 (Implementation):} Explains the practical software implementation, including temporal epoch freezing, Policy-as-Code validators, SHA-256 idempotency keying, write-ahead recovery, and the chaos harness.
+    \item \textbf{Chapter 6 (Results and Discussion):} Presents empirical ablation findings across conditions C0 to C4, category pass rates, latency benchmarks, 42 passing hermetic unit tests, error diagnoses, and deployment recommendations.
+    \item \textbf{Chapter 7 (Conclusion and Future Work):} Summarizes the core practical lessons learned, operational limitations, and high-impact directions for future development.
+\end{itemize}

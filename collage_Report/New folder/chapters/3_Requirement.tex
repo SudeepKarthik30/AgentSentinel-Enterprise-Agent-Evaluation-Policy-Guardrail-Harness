@@ -1,0 +1,248 @@
+%% Chapter 3 — Requirement Engineering
+%% Adapted to EffectGuard Project per IIIT Manipur CS4202 Guidelines
+
+\section{Introduction and Domain Description}
+
+The rapid enterprise adoption of autonomous tool-calling agents necessitates a rigorous engineering requirements analysis. In this project, the operational domain is an \textbf{Enterprise Customer Support and Financial Refund System}. 
+
+In modern electronic commerce operations, customer support agents are granted authorization to execute state-mutating financial transactions, including approving return requests, issuing cash refunds, modifying order records, and writing permanent confirmation tickets to relational accounting ledgers. Unlike read-only informational query systems, financial refund engines must operate under strict legal, accounting, and security constraints. A single operational failure---such as issuing a duplicate refund, processing an expired return, or acknowledging a transaction that was never committed to disk---incurs direct financial losses, audit discrepancies, and regulatory non-compliance.
+
+This chapter defines the comprehensive software engineering requirements for the EffectGuard Execution Safety Gateway and the AgentSentinel Chaos Evaluation Harness. We analyze stakeholder needs, formulate user personas, specify detailed functional and non-functional requirements, model operational use cases, and define the hardware, software, and deployment constraints governing the system.
+
+\section{Feasibility Analysis}
+
+A multi-dimensional feasibility study was conducted to ensure the technical viability, economic soundness, legal compliance, and operational sustainability of the system.
+
+\subsection{Technical Feasibility}
+The EffectGuard framework is architected using standard, production-ready open-source technologies and high-efficiency open-weight foundation models. The agent reasoning loop is orchestrated using LangGraph and LangChain in Python 3.12. The generative foundation model (\texttt{openai/gpt-oss-20b}) is hosted on Groq's Language Processing Unit (LPU) cloud inference infrastructure, delivering sub-second token generation latencies ($\approx 750$\,tokens/s) and predictable response times. 
+
+The persistent relational storage layer utilizes SQLite 3 operating in native Write-Ahead Logging (WAL) mode. SQLite WAL mode provides complete ACID compliance, serializable writes, and non-blocking concurrent reads without the operational overhead, network latency, or maintenance complexity of external database clusters. The entire framework executes hermetically on standard commodity hardware (x86\_64 CPU, 16\,GB RAM) without requiring local GPU acceleration, confirming 100\% technical feasibility.
+
+\subsection{Operational Feasibility}
+The system serves two distinct operational workflows:
+\begin{enumerate}
+    \item \textbf{Customer Support Operations:} Real-time interaction between retail customers and the autonomous support agent via the web-based chat console (\texttt{chat\_app.py}). The interface requires zero client-side installation, functioning seamlessly on standard modern web browsers.
+    \item \textbf{Safety and Reliability Engineering:} An operational evaluation and compliance workflow managed via the telemetry dashboard (\texttt{eval\_app.py}). Compliance officers and AI engineers can trigger hermetic chaos test matrices across 25 golden test cases, observe live Server-Sent Events (SSE) telemetry gauges, inspect tool execution journals, and verify Claim-vs-Ledger audit scorecards.
+\end{enumerate}
+Because both workflows provide automated, intuitive interfaces with minimal operational overhead, the system is operationally feasible.
+
+\subsection{Economic Feasibility}
+All primary software libraries (Python 3.12, LangChain, LangGraph, Pydantic v2, FastAPI, Uvicorn, and Pytest) are distributed under permissive open-source licenses (Apache 2.0 and MIT), incurring zero licensing expenditures. Foundation model inference is served via Groq's high-efficiency API tier, consuming minimal developer credits. The direct software licensing and hardware acquisition cost of the project is Rs.~0.00, confirming complete economic feasibility.
+
+\subsection{Legal and Ethical Feasibility}
+The evaluation dataset, customer profiles, order histories, and purchase transactions utilized in this study are entirely synthetic benchmarks constructed specifically for academic evaluation. No proprietary consumer personal data, real credit card credentials, or protected personal information is processed or stored. Simulated network attacks (such as post-commit 504 timeouts and dropped sockets) are executed strictly within an isolated local mock environment, causing zero impact on external telecommunications networks. The project fully complies with standard academic research ethics and software licensing agreements.
+
+\section{Stakeholder Analysis and User Personas}
+
+To ensure that the requirements reflect enterprise reality, four primary stakeholder classes were analyzed:
+
+\begin{enumerate}
+    \item \textbf{Retail Customer (End-User):}
+    \begin{itemize}
+        \item \textit{Objective:} Quickly ascertain order histories, check return eligibility, and receive confirmed refund receipts.
+        \item \textit{Pain Points:} Confusing return calculations, unacknowledged transactions, and false assurances where the agent claims a refund was processed but no money arrives.
+    \end{itemize}
+
+    \item \textbf{Enterprise Business Owner:}
+    \begin{itemize}
+        \item \textit{Objective:} Maximize customer satisfaction while strictly preventing inventory and financial loss.
+        \item \textit{Pain Points:} Uncapped financial disbursements, prompt injection attacks that trick agents into refunding expired or unpurchased items, and duplicate payouts caused by distributed network timeouts.
+    \end{itemize}
+
+    \item \textbf{Financial Compliance and Security Auditor:}
+    \begin{itemize}
+        \item \textit{Objective:} Maintain 100\% reconcilability between customer-facing conversational transcripts and backend database ledgers.
+        \item \textit{Pain Points:} ``Ghost mutations'' where database rows are updated without customer notification, and ``False claims'' where agents hallucinate receipt IDs that do not exist in the database.
+    \end{itemize}
+
+    \item \textbf{AI Reliability and DevOps Engineer:}
+    \begin{itemize}
+        \item \textit{Objective:} Deploy resilient agent architectures that degrade gracefully under cloud network turbulence.
+        \item \textit{Pain Points:} Naive retry loops that consume excessive LLM tokens, spike API costs, and trigger catastrophic double-spend write cascades during cloud network blips.
+    \end{itemize}
+\end{enumerate}
+
+\section{Software Requirement Specification (SRS)}
+
+\subsection{Functional Requirements}
+
+The functional requirements capture the specific computational capabilities and boundary constraints enforced by EffectGuard and AgentSentinel. Table~\ref{tab:fr} details requirements FR-01 through FR-08.
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{|p{1.4cm}|p{3.4cm}|p{8.5cm}|}
+\hline
+\rowcolor{gray!15}
+\textbf{ID} & \textbf{Requirement} & \textbf{Operational Description} \\
+\hline
+\textbf{FR-01} & Tool Effect Classification & The gateway shall inspect every incoming tool invocation and partition actions into \texttt{read\_only} (passed with zero overhead) and \texttt{irreversible} (quarantined for invariant validation). \\
+\hline
+\textbf{FR-02} & Policy-as-Code Preconditions & The gateway shall evaluate declarative invariants outside prompt space: user existence, strictly positive amounts, per-transaction ceiling ($\le$ Rs.~500.00), and unrefunded purchase balance verification. \\
+\hline
+\textbf{FR-03} & Deterministic SHA-256 Keys & The gateway shall derive a 256-bit hash from canonicalized argument JSON, thread identifier, and tool name to guarantee identical keys across retry attempts. \\
+\hline
+\textbf{FR-04} & Write-Ahead Journaling & The system shall log tool execution lifecycle states (\texttt{PENDING}, \texttt{COMMITTED}, \texttt{FAILED}) to a persistent relational journal prior to touching production data. \\
+\hline
+\textbf{FR-05} & Verify-Before-Retry Protocol & Upon catching an HTTP 504 post-commit socket timeout, the gateway shall query persistent storage using the idempotency key, recovering pre-committed tickets without re-executing mutations. \\
+\hline
+\textbf{FR-06} & Claim-vs-Ledger Auditing & The system shall extract natural-language assertions and structured outputs, diffing them against committed database rows to detect False Claims, Ghost Mutations, and Amount Drift. \\
+\hline
+\textbf{FR-07} & Item Status Synchronization & The database layer shall transition item statuses from \texttt{PURCHASED} to \texttt{REFUNDED} and link them to unique ticket identifiers, preventing cross-session duplicate returns. \\
+\hline
+\textbf{FR-08} & Frozen Temporal Epoch & The evaluation harness shall freeze benchmark date calculations to a static epoch (\texttt{2026-10-26}), guaranteeing deterministic 30-day window boundary evaluations. \\
+\hline
+\end{tabular}
+\caption{Functional requirements specification for the EffectGuard execution gateway and evaluation harness.}
+\label{tab:fr}
+\end{table}
+
+\subsection{Non-Functional Requirements}
+
+The non-functional requirements define the quality attributes, safety guarantees, performance thresholds, and operational constraints governing the system. Table~\ref{tab:nfr} summarizes NFR-01 through NFR-06.
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{|p{1.4cm}|p{3.2cm}|p{8.7cm}|}
+\hline
+\rowcolor{gray!15}
+\textbf{ID} & \textbf{Quality Attribute} & \textbf{Target Specification} \\
+\hline
+\textbf{NFR-01} & Financial Safety & The system shall guarantee strictly zero duplicate tickets and Rs.~0.00 excess monetary loss across all test conditions and chaos fault rates. \\
+\hline
+\textbf{NFR-02} & Deterministic Invariants & All policy preconditions shall execute in pure deterministic Python code, achieving 100\% rejection of illegal transactions regardless of adversarial prompt framing. \\
+\hline
+\textbf{NFR-03} & Gateway Latency Overhead & Interception, argument canonicalization, SHA-256 key derivation, and WAL journaling shall introduce less than 1.0\,ms of computational overhead per tool call. \\
+\hline
+\textbf{NFR-04} & Concurrency and ACID & Relational storage shall operate under SQLite Write-Ahead Logging (WAL) mode, guaranteeing atomic commits and non-blocking concurrent reads. \\
+\hline
+\textbf{NFR-05} & Fault Resilience & The gateway shall recover 100.0\% of committed transactions under 20\% and 35\% active network socket dropouts without human intervention. \\
+\hline
+\textbf{NFR-06} & Test Hermeticity & The benchmark suite shall execute in complete isolation, initializing and resetting ephemeral databases to guarantee 100\% reproducible results across runs. \\
+\hline
+\end{tabular}
+\caption{Non-functional requirements specification defining safety, latency, and reliability targets.}
+\label{tab:nfr}
+\end{table}
+
+\section{Use Case Modeling}
+
+The operational behavior of the system is formalized via UML use case modeling. Figure~\ref{fig:usecase} illustrates the system boundaries, operational actors, and core interactions.
+
+\begin{figure}[H]
+\centering
+\makebox[\textwidth][c]{
+\begin{tikzpicture}[
+  scale=0.85, every node/.style={transform shape},
+  actor/.style={font=\small\bfseries, text centered, minimum width=1.5cm},
+  usecase/.style={ellipse, draw=blue!80!black, fill=blue!8, text centered,
+                  minimum width=3.6cm, minimum height=0.75cm, font=\scriptsize\bfseries},
+  assoc/.style={->, >=stealth, thick, draw=black!70}
+]
+%% System boundary
+\draw[draw=black!60, fill=gray!4, rounded corners=6pt, line width=0.8pt]
+  (1.4, -0.4) rectangle (10.6, -8.6);
+\node[font=\small\bfseries, text=blue!80!black] at (6.0, -0.8) {EffectGuard Execution Safety Boundary};
+
+%% Use case ellipses (inside boundary)
+\node[usecase] at (6.0, -1.8)  (uc1) {UC-01: Process Valid Return};
+\node[usecase] at (6.0, -3.0)  (uc2) {UC-02: Stage Partial Cart};
+\node[usecase] at (6.0, -4.2)  (uc3) {UC-03: Enforce Policy Preconditions};
+\node[usecase] at (6.0, -5.4)  (uc4) {UC-04: Recover Post-Commit Timeout};
+\node[usecase] at (6.0, -6.6)  (uc5) {UC-05: Audit Claim vs.\ Ledger};
+\node[usecase] at (6.0, -7.8)  (uc6) {UC-06: Run Chaos Benchmark Matrix};
+
+%% Actors (outside boundary)
+\node[actor] at (-1.2, -2.4) (customer) {Customer};
+\draw[fill=black!75] (-1.2, -1.6) circle (0.2cm);
+\draw[thick, black!75] (-1.2, -1.8) -- (-1.2, -2.6);
+\draw[thick, black!75] (-1.6, -2.1) -- (-0.8, -2.1);
+\draw[thick, black!75] (-1.2, -2.6) -- (-1.5, -3.1);
+\draw[thick, black!75] (-1.2, -2.6) -- (-0.9, -3.1);
+
+\node[actor] at (-1.2, -6.0) (auditor) {Auditor};
+\draw[fill=black!75] (-1.2, -5.2) circle (0.2cm);
+\draw[thick, black!75] (-1.2, -5.4) -- (-1.2, -6.2);
+\draw[thick, black!75] (-1.6, -5.7) -- (-0.8, -5.7);
+\draw[thick, black!75] (-1.2, -6.2) -- (-1.5, -6.7);
+\draw[thick, black!75] (-1.2, -6.2) -- (-0.9, -6.7);
+
+\node[actor] at (12.4, -5.0) (admin) {AI Engineer};
+\draw[fill=black!75] (12.4, -4.2) circle (0.2cm);
+\draw[thick, black!75] (12.4, -4.4) -- (12.4, -5.2);
+\draw[thick, black!75] (12.0, -4.7) -- (12.8, -4.7);
+\draw[thick, black!75] (12.4, -5.2) -- (12.1, -5.7);
+\draw[thick, black!75] (12.4, -5.2) -- (12.7, -5.7);
+
+%% Associations
+\draw[assoc] (customer) -- (uc1);
+\draw[assoc] (customer) -- (uc2);
+\draw[assoc] (customer) -- (uc3);
+\draw[assoc] (auditor)  -- (uc5);
+\draw[assoc] (admin)    -- (uc4);
+\draw[assoc] (admin)    -- (uc5);
+\draw[assoc] (admin)    -- (uc6);
+
+\end{tikzpicture}
+}
+\caption{UML use case diagram illustrating operational actors, system boundaries, and core functional use cases.}
+\label{fig:usecase}
+\end{figure}
+
+\subsection{Detailed Operational Scenarios}
+
+To ground these use cases in concrete business logic, we analyze three primary operational flows:
+
+\begin{enumerate}
+    \item \textbf{Scenario A: Standard Return Fulfillment (UC-01):}
+    A registered customer (\texttt{sarah\_m}) queries order history and requests a refund for an eligible item (\texttt{Ergonomic Office Chair}, Rs.~70.00) purchased 11 days prior (well within the 30-day cutoff). The agent retrieves purchase history, calls \texttt{calculate\_right\_refund}, validates eligibility, and calls \texttt{issue\_refund\_ticket}. The gateway verifies that the user exists, the amount is positive and under Rs.~500.00, and the item has not been refunded. A unique ticket is committed to the database, the purchase status is updated to \texttt{REFUNDED}, and the customer receives an official confirmation receipt.
+
+    \item \textbf{Scenario B: Partial Cart Eligibility and Mixed Staging (UC-02):}
+    A customer (\texttt{marcus\_l}) requests returns for three distinct items in a single prompt: an item purchased within 30 days (Rs.~45.00), an item purchased 42 days ago (Rs.~80.00, expired), and an item never purchased (Rs.~30.00). The agent must parse the multi-item request, call \texttt{calculate\_right\_refund} to stage only the eligible item, reject the expired and unpurchased items with clear textual explanations, and dispatch \texttt{issue\_refund\_ticket} strictly for Rs.~45.00.
+
+    \item \textbf{Scenario C: Post-Commit Timeout Recovery under Network Chaos (UC-04):}
+    During the execution of \texttt{issue\_refund\_ticket}, the SQLite database successfully writes ticket \texttt{TICK-7A9B} to persistent disk. However, the chaos monkey drops the socket before the acknowledgment packet returns to the agent runtime. Instead of issuing a duplicate write, the gateway catches the exception, uses the SHA-256 key to query the database, detects the committed row, and returns the cached receipt. The customer receives a single refund ticket, and corporate ledgers remain 100\% balanced.
+\end{enumerate}
+
+\section{Hardware, Software, and Environment Specifications}
+
+Table~\ref{tab:tech_stack} summarizes the complete technology stack and operational deployment specifications.
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{|p{3.5cm}|p{2.8cm}|p{7.2cm}|}
+\hline
+\rowcolor{gray!15}
+\textbf{Subsystem / Layer} & \textbf{Technology} & \textbf{Operational Function} \\
+\hline
+Operating Environment & Linux / Windows x64 & Host execution environment \\
+\hline
+Core Language & Python 3.12 & Primary application and benchmark implementation \\
+\hline
+Agent Orchestration & LangGraph, LangChain & Cyclic state graph, message passing, ReAct loops \\
+\hline
+Foundation Model & OpenAI OSS 20B & 20-billion parameter reasoning LLM \\
+\hline
+Inference Accelerator & Groq Cloud LPU & High-speed token generation ($\approx 750$\,tok/s) \\
+\hline
+Database Engine & SQLite 3 (WAL Mode) & ACID transactional persistence and WAL journal \\
+\hline
+Data Validation & Pydantic v2 & Parameter canonicalization and response schema gating \\
+\hline
+Web and API Service & FastAPI, Uvicorn & Asynchronous REST and Server-Sent Events service \\
+\hline
+Automated Test Suite & Pytest 9.1 & Hermetic test suite comprising 42 unit and integration tests \\
+\hline
+\end{tabular}
+\caption{System technology stack and deployment specifications.}
+\label{tab:tech_stack}
+\end{table}
+
+\section{Chapter Summary}
+
+This chapter established the complete software engineering requirements for the EffectGuard execution safety gateway. Through comprehensive feasibility studies, stakeholder personas, functional specifications (FR-01 to FR-08), non-functional constraints (NFR-01 to NFR-06), and UML use case modeling, we have defined the necessary boundaries to eliminate the Agent Execution-State Paradox. In the next chapter, we translate these requirements into concrete system designs, architectural flowcharts, database schemas, and sequence protocols.

@@ -1,0 +1,323 @@
+%% ─────────────────────────────────────────────────────────
+%%  Chapter 3 — Requirement Engineering
+%%  Formatting: longtables have caption, endfirsthead, endhead,
+%%  endfoot, endlastfoot. Column widths are within 14.5 cm.
+%% ─────────────────────────────────────────────────────────
+
+\section{Feasibility Study}
+
+\subsection{Technical Feasibility}
+The system is built entirely on accessible, open-source technologies. The embedding model
+(\texttt{all-MiniLM-L6-v2}) runs locally without GPU requirements, making it deployable on
+standard academic workstations. The vector store (ChromaDB in-memory mode) requires no
+database server. The generative LLM is accessed via the Groq API, which provides free-tier
+access to Llama 3.3~70B. The Streamlit frontend requires only a Python environment.
+All dependencies are installable via \texttt{pip}. The entire system runs on a single machine
+with 8\,GB RAM, confirming full technical feasibility.
+
+\subsection{Operational Feasibility}
+The system is designed for two user classes: a \textit{patient} role accessing public
+guidelines and a research/demo mode for evaluating attack scenarios. The interface is a
+web-based Streamlit application requiring no installation from the end-user's perspective.
+Attack and defence states are toggled through sidebar controls, making the system operable
+without technical expertise. For researchers, the evaluation script
+(\texttt{scripts/evaluate.py}) automates the full 100-query benchmark with a single command.
+
+\subsection{Economic Feasibility}
+All components are open-source or free-tier:
+\begin{itemize}
+    \item Groq API: Free tier with 14{,}400 tokens/minute limit, sufficient for evaluation.
+    \item Sentence-Transformers: Open-source (Apache 2.0 licence).
+    \item ChromaDB: Open-source (Apache 2.0 licence).
+    \item Streamlit: Open-source (Apache 2.0 licence).
+\end{itemize}
+The total monetary cost of the project is \$0, confirming economic feasibility.
+
+\subsection{Legal and Ethical Feasibility}
+All documents in the knowledge base are sourced from \textbf{publicly available clinical
+guidelines} published by the NHS, CDC, and WHO. No real patient data is used. The attack
+scenarios are simulated on synthetic adversarial documents created specifically for research.
+The project explicitly does not process, store, or transmit any personally identifiable
+information (PII) or protected health information (PHI), and therefore does not fall under
+HIPAA's Privacy Rule. All research activities comply with standard academic ethics guidelines
+for AI security research.
+
+%% ─────────────────────────────────────────────────────────
+\section{Requirement Elicitation and Analysis}
+
+\subsection{Stakeholders}
+\begin{itemize}
+    \item \textbf{Primary User (Patient):} Accesses only public-classified documents.
+          Receives grounded, safety-scored answers to healthcare queries.
+    \item \textbf{Security Researcher:} Uses the Attack Demo mode to observe the
+          three-condition comparison (clean, poisoned, defended) and analyse per-layer
+          defence effectiveness.
+    \item \textbf{System Administrator:} Uses the sidebar controls to inject poisoned
+          documents, reset the database, and monitor clean vs.\ poisoned document counts.
+\end{itemize}
+
+\subsection{Methods Used for Requirement Elicitation}
+
+Requirements were elicited through three complementary methods, chosen to match the
+research-oriented nature of the project:
+\begin{enumerate}
+    \item \textbf{Literature Analysis:} The functional security requirements were derived
+          directly from the attack taxonomy documented in PoisonedRAG (Zou et al., 2025),
+          Greshake et al.\ (2023), and the OWASP LLM Top~10 (2025). Each identified attack
+          vector (knowledge poisoning, indirect injection, cross-tenant leakage) corresponds
+          to at least one implemented defence layer.
+    \item \textbf{Threat Modelling using MITRE ATLAS:} Non-functional security requirements
+          (NFR-02, NFR-03, NFR-07) were derived by mapping the project's threat surface to
+          the MITRE ATLAS adversarial taxonomy (AML.T0043, AML.T0051, AML.T0020).
+    \item \textbf{Iterative Prototyping:} UI and pipeline requirements evolved through three
+          implementation cycles. The attack demo three-column layout was added after the
+          first prototype revealed that side-by-side comparison was essential for
+          demonstrating the Implicit Trust Paradox. No direct user interviews were conducted
+          given the research nature of the system.
+\end{enumerate}
+
+\subsection{Use Cases}
+\begin{enumerate}
+    \item \textbf{UC-01:} Patient submits a medical query and receives a risk-scored,
+          grounded answer.
+    \item \textbf{UC-02:} Researcher runs the attack demo to observe how a poisoned RAG
+          produces incorrect medical advice.
+    \item \textbf{UC-03:} Researcher activates the defence and observes CRIR reduction in
+          the defended column.
+    \item \textbf{UC-04:} Administrator injects poisoned documents via the sidebar and
+          verifies the DB count updates.
+    \item \textbf{UC-05:} Administrator resets the database to the clean baseline state.
+    \item \textbf{UC-06:} Researcher expands the Defence Logs to inspect which documents
+          were retrieved, blocked, and why.
+\end{enumerate}
+\begin{figure}[H]
+\centering
+\makebox[\textwidth]{ % <-- THIS FIXES TRUE CENTERING
+
+\begin{tikzpicture}[
+  actor/.style={font=\small, text centered, minimum width=1.5cm},
+  usecase/.style={ellipse, draw=black!70, fill=blue!6, text centered,
+                  minimum width=3.2cm, minimum height=0.75cm, font=\footnotesize},
+  assoc/.style={thin, black!60}
+]
+%% System boundary
+\draw[draw=black!50, fill=gray!3, rounded corners=4pt]
+  (1.2,-0.3) rectangle (9.8,-8.5);
+\node[font=\small\bfseries] at (5.5, -0.7) {MediCare Secure RAG System};
+
+%% Use case ellipses (inside boundary)
+\node[usecase] at (5.5,-1.8)  (uc1) {UC-01: Submit medical query};
+\node[usecase] at (5.5,-3.0)  (uc2) {UC-02: Run attack demo};
+\node[usecase] at (5.5,-4.2)  (uc3) {UC-03: Activate defence};
+\node[usecase] at (5.5,-5.4)  (uc4) {UC-04: Inject poisoned docs};
+\node[usecase] at (5.5,-6.6)  (uc5) {UC-05: Reset database};
+\node[usecase] at (5.5,-7.8)  (uc6) {UC-06: Inspect Defence Logs};
+
+%% Actors (outside boundary)
+\node[actor] at (-1.0,-1.8) (patient) {Patient};
+\draw[fill=black!70] (-1.0,-1.0) circle (0.2cm);
+\draw[black!70] (-1.0,-1.2) -- (-1.0,-2.0);
+\draw[black!70] (-1.4,-1.5) -- (-0.6,-1.5);
+\draw[black!70] (-1.0,-2.0) -- (-1.3,-2.5);
+\draw[black!70] (-1.0,-2.0) -- (-0.7,-2.5);
+
+\node[actor] at (-1.0,-5.0) (researcher) {Researcher};
+\draw[fill=black!70] (-1.0,-4.2) circle (0.2cm);
+\draw[black!70] (-1.0,-4.4) -- (-1.0,-5.2);
+\draw[black!70] (-1.4,-4.7) -- (-0.6,-4.7);
+\draw[black!70] (-1.0,-5.2) -- (-1.3,-5.7);
+\draw[black!70] (-1.0,-5.2) -- (-0.7,-5.7);
+
+\node[actor] at (11.5,-6.0) (admin) {Administrator};
+\draw[fill=black!70] (11.5,-5.2) circle (0.2cm);
+\draw[black!70] (11.5,-5.4) -- (11.5,-6.2);
+\draw[black!70] (11.1,-5.7) -- (11.9,-5.7);
+\draw[black!70] (11.5,-6.2) -- (11.2,-6.7);
+\draw[black!70] (11.5,-6.2) -- (11.8,-6.7);
+
+%% Associations
+\draw[assoc] (patient)    -- (uc1);
+\draw[assoc] (researcher) -- (uc2);
+\draw[assoc] (researcher) -- (uc3);
+\draw[assoc] (researcher) -- (uc6);
+\draw[assoc] (admin)      -- (uc4);
+\draw[assoc] (admin)      -- (uc5);
+\draw[assoc] (admin)      -- (uc6);
+
+\end{tikzpicture}
+
+} % <-- end makebox
+
+\caption{UML use case diagram showing system boundary, three actor types (Patient, Researcher, Administrator), and six identified use cases with actor associations.}
+\label{fig:usecase}
+\end{figure}
+\section{Software Requirement Specification (SRS)}
+
+\subsection{Functional Requirements}
+
+\setlength{\LTleft}{\fill}
+\setlength{\LTright}{\fill}
+
+\renewcommand{\arraystretch}{1.05} % slightly compact
+
+\begin{longtable}{|p{1.2cm}|p{3.8cm}|p{7.0cm}|}
+\caption{Functional Requirements of MediCare Secure RAG.}
+\label{tab:fr} \\
+\hline
+\rowcolor{gray!15}
+\textbf{ID} & \textbf{Requirement} & \textbf{Description} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{l}{\small\textit{Table \thetable{} continued from previous page}} \\[2pt]
+\hline
+\rowcolor{gray!15}
+\textbf{ID} & \textbf{Requirement} & \textbf{Description} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{\small\textit{Continue in next page}} \\  % <-- your required wording
+\endfoot
+
+\hline
+\endlastfoot
+
+FR-01 & Document Ingestion       & System shall load clean JSONL documents into the
+                                    ChromaDB in-memory collection on startup. \\
+\hline
+FR-02 & Adversarial Injection    & System shall support injection of 27 poisoned documents
+                                    via a sidebar button without resetting the clean corpus. \\
+\hline
+FR-03 & Semantic Retrieval       & System shall retrieve top-5 semantically similar
+                                    documents using cosine similarity over sentence embeddings. \\
+\hline
+FR-04 & Defence Layer Execution  & System shall pass retrieved documents through Layers~2,
+                                    1, and~5 sequentially (in that order), blocking
+                                    adversarial documents at each stage. \\
+\hline
+FR-05 & Hardened Generation      & System shall pass only approved documents to the LLM
+                                    using a positional-delimiter secure prompt template
+                                    (Layer~3). \\
+\hline
+FR-06 & Output Monitoring        & System shall scan generated responses for 8 defined
+                                    danger patterns using compiled regex (Layer~4). \\
+\hline
+FR-07 & CRIR Computation         & System shall compute the binary CRIR score (0 or 1)
+                                    and retrieval precision metric for every query. \\
+\hline
+FR-08 & Risk Scoring             & System shall compute a composite risk score (0--100)
+                                    from CRIR, blocked count, groundedness, and validation
+                                    issues. \\
+\hline
+FR-09 & Attack Demo              & System shall execute a sequential three-condition
+                                    comparison (clean, poisoned, defended) for any
+                                    user-supplied query. \\
+\hline
+FR-10 & Database Reset           & System shall reset the ChromaDB collection to the clean
+                                    baseline on administrator request. \\
+\hline
+
+\end{longtable}
+
+\subsection{Non-Functional Requirements}
+
+\setlength{\LTleft}{\fill}
+\setlength{\LTright}{\fill}
+
+\renewcommand{\arraystretch}{1.05}
+
+\begin{longtable}{|p{1.2cm}|p{3.2cm}|p{7.5cm}|}
+\caption{Non-Functional Requirements of MediCare Secure RAG.}
+\label{tab:nfr} \\
+\hline
+\rowcolor{gray!15}
+\textbf{ID} & \textbf{Category} & \textbf{Requirement} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{l}{\small\textit{Table \thetable{} continued from previous page}} \\[2pt]
+\hline
+\rowcolor{gray!15}
+\textbf{ID} & \textbf{Category} & \textbf{Requirement} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{\small\textit{Continue in next page}} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+NFR-01 & Performance       & Response latency shall not exceed 8 seconds per query under
+                             normal network conditions. \\
+\hline
+NFR-02 & Accuracy          & Clean DB CRIR score shall be 0.0 across all evaluation queries
+                             (zero false positives from the defence pipeline). \\
+\hline
+NFR-03 & Security          & The system shall not expose API keys, system prompts, or
+                             internal database contents in any response. \\
+\hline
+NFR-04 & Usability         & The Streamlit interface shall be operable without any
+                             installation steps beyond \texttt{pip install} and
+                             \texttt{streamlit run}. \\
+\hline
+NFR-05 & Reproducibility   & The evaluation script shall produce identical summary statistics
+                             on the same hardware given the same JSONL inputs. \\
+\hline
+NFR-06 & Maintainability   & All defence layers shall be implemented in isolated,
+                             independently testable Python functions. \\
+\hline
+NFR-07 & Compliance        & The knowledge base shall contain exclusively publicly available
+                             clinical guidelines with no PII or PHI. \\
+\hline
+
+\end{longtable}
+%% ─────────────────────────────────────────────────────────
+\section{Technology Stack}
+
+\setlength{\LTleft}{\fill}
+\setlength{\LTright}{\fill}
+
+\renewcommand{\arraystretch}{1.05}
+
+\begin{longtable}{|p{3.0cm}|p{4.2cm}|p{4.8cm}|}
+\caption{Technology Stack and Primary Security Role of Each Component.}
+\label{tab:techstack} \\
+\hline
+\rowcolor{gray!15}
+\textbf{Component} & \textbf{Technology} & \textbf{Primary Security Role} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{l}{\small\textit{Table \thetable{} continued from previous page}} \\[2pt]
+\hline
+\rowcolor{gray!15}
+\textbf{Component} & \textbf{Technology} & \textbf{Primary Security Role} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{\small\textit{Continue in next page}} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+Vector Store      & ChromaDB (in-memory)                          & Secure storage and metadata-filtered retrieval \\
+\hline
+Embeddings        & Sentence-Transformers (\texttt{all-MiniLM-L6-v2}) & Semantic mapping and anomaly detection \\
+\hline
+Generative LLM    & Groq-hosted Llama 3.3 70B                    & Final reasoning and medical synthesis \\
+\hline
+Frontend          & Streamlit                                     & UI-based attack simulation and monitoring \\
+\hline
+Language          & Python 3.10+                                  & Core orchestration and all defence layers \\
+\hline
+Environment       & \texttt{python-dotenv}                        & Secure API key management via \texttt{.env} \\
+\hline
+HTTP Client       & Groq Python SDK                               & LLM API communication \\
+\hline
+
+\end{longtable}

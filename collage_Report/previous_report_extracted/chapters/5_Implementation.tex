@@ -1,0 +1,171 @@
+\section{Tools and Development Environment}
+
+\setlength{\LTleft}{\fill}
+\setlength{\LTright}{\fill}
+
+\renewcommand{\arraystretch}{1.05}
+
+\begin{longtable}{|p{3.3cm}|p{2.4cm}|p{5.8cm}|}
+\caption{Development Tools and Libraries.}
+\label{tab:tools} \\
+\hline
+\rowcolor{gray!15}
+\textbf{Tool / Library} & \textbf{Version} & \textbf{Purpose} \\
+\hline
+\endfirsthead
+
+\multicolumn{3}{l}{\small\textit{Table \thetable{} continued from previous page}} \\[2pt]
+\hline
+\rowcolor{gray!15}
+\textbf{Tool / Library} & \textbf{Version} & \textbf{Purpose} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{\small\textit{Continue in next page}} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+Python       & 3.10+ & Core implementation language \\
+\hline
+Streamlit    & 1.33+ & Interactive web UI \\
+\hline
+Sentence-Transformers & 2.6+ & Local embedding generation \\
+\hline
+Groq Python SDK & 0.8+ & Llama 3.3 70B API access \\
+\hline
+python-dotenv & 1.0+ & Environment variable management \\
+\hline
+VS Code      & Latest & Development IDE \\
+\hline
+Git          & 2.40+ & Version control \\
+\hline
+
+\end{longtable}
+
+The \texttt{.env} file stores two configuration values:
+\begin{verbatim}
+GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxx
+GROQ_MODEL=llama-3.3-70b-versatile
+\end{verbatim}
+
+\section{Implementation of Core Modules}
+
+\subsection{Vector Store (\texttt{rag/vector\_store.py})}
+
+The vector store uses \texttt{chromadb.Client()} in ephemeral in-memory mode --- a real ChromaDB instance that does not persist to disk. The collection (\texttt{healthcare\_rag}) is created fresh on each application startup via \texttt{\_get\_collection()}, and destroyed when the process exits. Documents are stored as ChromaDB records with full metadata and 384-dimensional embedding vectors. The key functions are:
+
+\begin{itemize}
+    \item \texttt{init\_db()}: Deletes any existing collection and recreates it, then loads all clean documents from \texttt{clean\_docs.jsonl} into ChromaDB.
+    \item \texttt{inject\_poison()}: Adds poisoned documents from \texttt{poisoned\_docs.jsonl} without duplicating existing IDs.
+    \item \texttt{reset\_db()}: Deletes and recreates the ChromaDB collection, clearing all documents.
+    \item \texttt{get\_doc\_count()}, \texttt{get\_poison\_count()}: Query the live ChromaDB collection for current document counts.
+    \item \texttt{get\_docs()}: Returns all documents from the ChromaDB collection as Python dictionaries with embeddings attached.
+\end{itemize}
+
+The ROLE\_ACCESS mapping enforcing Layer 2 is defined here:
+\begin{verbatim}
+ROLE_ACCESS = {
+    "patient": ["public"],
+    "nurse":   ["public", "internal"],
+    "doctor":  ["public", "internal", "restricted"],
+}
+\end{verbatim}
+
+\subsection{Retriever (\texttt{rag/retriever.py})}
+
+The retriever implements the vulnerable baseline. It computes the query embedding, then sorts all documents in the store by cosine similarity score and returns the top-$k=5$. The function intentionally includes no access control or anomaly checks, allowing poisoned documents to rank in the top-5 when crafted to share vocabulary with legitimate queries --- replicating the PoisonedRAG attack condition exactly.
+
+\subsection{Defence Module (\texttt{rag/defense.py})}
+
+This is the most operationally significant module, implementing four of the five defence layers:
+
+\textbf{Layer 1 --- \texttt{layer1\_sanitize(docs)}}: Iterates over all retrieved documents. For each document, it first searches for 8 marker-based injection patterns (compiled regex). Matches are stripped and the document is tagged \texttt{\_sanitized: True}. Subsequently, 5 semantic patterns are searched. A semantic match triggers a full document block.
+
+\textbf{Layer 2 --- \texttt{layer2\_access\_control(docs, role)}}: For each document, it checks whether the document's \texttt{classification} field is present in the role's allowed levels. Unauthorised documents are moved to \texttt{blocked\_docs} with reason logging.
+
+\textbf{Layer 4 --- \texttt{layer4\_monitor\_output(response)}}: Scans the LLM response string against 8 compiled danger patterns. HIGH-severity matches replace the response with a standardised block message. MEDIUM-severity issues are appended to the issues list and returned alongside the original response.
+
+\textbf{Layer 5 --- \texttt{layer5\_anomaly\_detect(docs)}}: Groups retrieved documents by topic. Computes pairwise cosine similarity for groups with $\geq2$ documents. Pairs exceeding the 0.70 cluster threshold from non-trusted sources are flagged and removed.
+
+\textbf{Convenience wrapper --- \texttt{defense\_filter(docs, domain, role)}}: Chains Layers 2, 1, and 5 sequentially, returning the safe document texts and a consolidated blocked list.
+
+\subsection{Generator (\texttt{rag/generator.py})}
+
+The generator implements two prompt modes:
+
+\textbf{Vulnerable mode:} All retrieved documents are joined with \texttt{---} separators and injected into a simple prompt with no instruction boundaries. This allows embedded instructions in poisoned documents to influence the model directly.
+
+\textbf{Secure mode:} Each document is wrapped in positional delimiters of the form \texttt{[REFERENCE DOCUMENT \{i\} - START]} ... \texttt{[REFERENCE DOCUMENT \{i\} - END]}. These are plain-text fences, not XML, ensuring the model treats them as structural boundaries rather than markup. Four critical rules are prepended in the system context. The Groq API is called with \texttt{temperature=0.0} and \texttt{max\_tokens=512} for deterministic, grounded outputs.
+
+\subsection{Pipeline Orchestrator (\texttt{rag/pipeline.py})}
+
+The pipeline function \texttt{run\_pipeline(query, role, mode, use\_defense)} orchestrates the full execution sequence:
+\begin{enumerate}
+    \item Classify the query as \texttt{medical} or \texttt{general}.
+    \item Handle casual conversation shortcuts (greetings, thanks).
+    \item Retrieve top-5 documents.
+    \item Compute the initial CRIR score from retrieved documents.
+    \item If defence is OFF: generate directly from retrieved documents in vulnerable mode.
+    \item If defence is ON: apply \texttt{defense\_filter} (Layers 2$\to$1$\to$5 in that order), generate in secure mode, apply Layer 4 output monitoring, validate response, merge issues.
+    \item Compute composite risk score.
+    \item Return a standardised result dictionary containing answer, retrieved docs, blocked docs, CRIR, risk score, risk level, validation result, and mode.
+\end{enumerate}
+
+\subsection{CRIR and Risk Scoring (\texttt{security/risk\_score.py})}
+
+\texttt{calculate\_crir(retrieved\_docs)} computes:
+\begin{itemize}
+    \item \textbf{Binary CRIR:} $1.0$ if any retrieved document has \texttt{kind=poisoned} or \texttt{safe=False}; $0.0$ otherwise.
+    \item \textbf{CRIR Precision:} $\frac{\text{clean documents retrieved}}{\text{total documents retrieved}}$.
+    \item \textbf{CRIR Recall:} $\frac{\text{clean documents retrieved}}{\text{total clean documents in KB}}$ (requires \texttt{total\_clean\_docs\_available}).
+\end{itemize}
+
+\texttt{compute\_risk(retrieved\_docs, blocked\_docs, validation\_result, defense\_enabled)} computes the composite UI risk score (0--100) by accumulating:
+\begin{itemize}
+    \item Base score: 20.
+    \item +50 if CRIR $> 0$ (poisoned document reached the pipeline).
+    \item +5 or +10 if blocked documents exist (reduced penalty when defence is active).
+    \item +20 if validation result is not safe.
+    \item +10 if response is not grounded.
+    \item +2 per validation issue (up to +10).
+\end{itemize}
+
+\section{Frontend Implementation (\texttt{app.py})}
+
+The Streamlit frontend renders a dark-mode, glassmorphism-styled interface using injected custom CSS. Key implementation highlights:
+
+\begin{itemize}
+    \item \textbf{Session state management:} Chat history, mode selection, and demo results are persisted in \texttt{st.session\_state} to survive re-runs.
+    \item \textbf{Chat bubble rendering:} User messages are right-aligned purple bubbles; AI responses are left-aligned dark surface bubbles with an avatar.
+    \item \textbf{Defence log expander:} A compact \texttt{st.expander} renders retrieved documents (green border) and blocked documents (red border) with per-document chip labels showing topic, classification, source, and attack type.
+    \item \textbf{Attack demo three-column layout:} Columns are populated sequentially by resetting and re-seeding the database between each condition to guarantee isolation.
+\end{itemize}
+
+\section{Deployment Configuration}
+
+The system is deployed locally via:
+\begin{verbatim}
+streamlit run app.py
+\end{verbatim}
+
+The evaluation suite is run via:
+\begin{verbatim}
+python -m scripts.evaluate
+\end{verbatim}
+
+For offline evaluation without the Groq API (retrieval metrics only):
+\begin{verbatim}
+python -m scripts.evaluate --skip-llm
+\end{verbatim}
+
+\section{Key Engineering Challenges and Solutions}
+
+\begin{enumerate}
+    \item \textbf{Semantic Injection Detection Without False Positives:} Semantic injection patterns are carefully constrained to short, highly specific phrases that would not appear in legitimate clinical guidelines, minimising false positives on clean documents.
+    \item \textbf{Embedding Computation at Query Time:} Embedding all retrieved documents at query time (rather than pre-computing only at ingestion) enables Layer 5 to detect similarity patterns even for dynamically injected documents with forged metadata.
+    \item \textbf{State Isolation in Attack Demo:} The three-condition comparison requires the database to be reset and re-populated between conditions to prevent cross-contamination of results. This is implemented by calling \texttt{reset\_db() + init\_db() + inject\_poison()} in sequence within the Streamlit run block.
+    \item \textbf{Deduplication of Validation Issues:} Layer 4 and the response validator may independently flag identical issues. A deduplication function (\texttt{\_dedupe\_issues}) using a tuple key \texttt{(type, severity, reason)} prevents duplicate issue entries in the UI.
+\end{enumerate}

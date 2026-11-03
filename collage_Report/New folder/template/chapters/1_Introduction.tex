@@ -1,0 +1,93 @@
+\section{Context and Motivation}
+\label{sec:intro_context}
+The rapid advancement of Large Language Models (LLMs) has catalyzed a fundamental paradigm shift in artificial intelligence: transitioning from passive, text-generating conversational models toward active, autonomous \textit{agentic systems}~\cite{yao2022react,schick2023toolformer}. Modern autonomous agents leverage foundation models as reasoning and planning engines that interpret unstructured natural language requests, decompose goals into sequential steps, and execute concrete actions by interacting with external Application Programming Interfaces (APIs), databases, web services, and internal software tools~\cite{patil2023gorilla,qin2023toolllm}. 
+
+In enterprise environments, autonomous agents are rapidly transitioning from research prototypes into mission-critical production pipelines. Enterprises across financial technology, e-commerce, telecommunications, and cloud infrastructure operations increasingly deploy tool-calling agents to automate customer service inquiries, balance reconciliations, refund ticket processing, subscription adjustments, and resource provisioning~\cite{yao2024taubench}. In these high-stakes operational environments, agents are not merely generating informational advice; they are granted direct authority to invoke state-mutating actions that alter financial ledgers, modify database records, transfer funds, and impact human users~\cite{garciamolina1987sagas,gray1993transaction}.
+
+Despite this operational adoption, current evaluation and safety frameworks for autonomous agents suffer from a profound and dangerous architectural blind spot: they evaluate agents almost entirely by assessing the \textit{linguistic surface form} of their textual output~\cite{zheng2023judging,li2023alpacaeval}. Standard benchmarking frameworks (such as MMLU, MT-Bench, AlpacaEval, or DeepEval~\cite{deval2024deepeval}) grade an agent like a student writing an essay. If an agent produces a fluent, polite response stating:
+\begin{center}
+    \textit{``I have successfully verified your eligibility and processed a refund of \$45.00 to your original payment method,''}
+\end{center}
+conventional linguistic evaluators award a perfect accuracy score. These evaluators remain fundamentally oblivious to the physical reality of the underlying computing system: Did the agent actually invoke the refund tool? Did it verify the user's identity against the database? Did it execute the transaction for the correct user, or did it accidentally debit a stranger's account? Did it calculate the monetary amount in strict accordance with business policy, or did it invent a payout sum? And most critically, when the underlying network dropped during execution, did the agent issue duplicate transactions upon retrying, causing direct financial loss?
+
+\section{Problem Formulation and Real-World Failure Modes}
+\label{sec:intro_problem}
+When language models cross the boundary from conversational reasoning to real-world software execution, they become subject to the immutable laws and failure modes of distributed systems, concurrency, and persistent state management~\cite{tanenbaum2007distributed}. Through empirical observation and systems analysis, this investigation identifies four fundamental failure modes that render unconstrained LLM agents unreliable and hazardous in enterprise environments:
+
+\subsection{Linguistic Hallucinations (False Claims)}
+Language models are trained using next-token prediction objectives on massive textual corpora, optimizing for conversational plausibility rather than physical operational truth. Consequently, an agent can articulate with absolute rhetorical confidence that an action has been committed, even when:
+\begin{enumerate}
+    \item The agent never called the requisite backend tool;
+    \item The tool call was rejected by the underlying server due to invalid authentication or database locks;
+    \item The agent hallucinated a completely fabricated transaction ID (e.g., claiming ``Ticket \#TICK-998822 generated'' when zero rows were inserted into the persistent database).
+\end{enumerate}
+This failure mode, which we formalize as a \textbf{False Claim}, leaves human customers with the belief that their request has been resolved, while the corporate database remains unchanged, leading to customer attrition, audit failures, and operational deadlock.
+
+\subsection{Ghost Mutations (Silent Side-Effects)}
+The inverse of linguistic hallucination is the phenomenon of \textbf{Ghost Mutations}. In this failure mode, the agent successfully executes an irreversible, state-mutating tool (e.g., inserting a financial refund record into the database), but subsequently encounters an internal reasoning failure, an unexpected parsing exception, or context window truncation. As a consequence, the agent outputs a conversational response apologizing for an inability to fulfill the request or claiming that the transaction failed. In reality, the database state has already been modified. In enterprise accounting, silent mutations destroy transactional auditability and prevent reconciliations between customer service logs and persistent financial ledgers.
+
+\subsection{The Commit-Timeout Dilemma and Duplicate Payouts}
+In any real-world distributed infrastructure, network communication is inherently unreliable~\cite{rfc9110}. Consider an autonomous agent tasked with executing a customer refund. The agent invokes the tool \texttt{issue\_refund\_ticket(user="user124", refund\_amount=12)}. The request reaches the database server, which commits the record to disk. However, before the HTTP 200 OK acknowledgement packet reaches the agent's runtime, a transient network partition occurs, resulting in an HTTP 504 Gateway Timeout or TCP socket reset.
+
+Under standard ReAct (Reasoning and Acting) execution loops~\cite{yao2022react}, the agent observes an unhandled exception or timeout error in its observation scratchpad. Guided by naive prompt instructions or standard retry wrappers, the agent attempts to recover by retrying the tool invocation. Because naive systems lack transactional idempotency guarantees, the database server treats the retried request as an entirely new transaction, inserting a duplicate record and executing a second financial transfer. In our baseline empirical experiments, this exact failure mode caused autonomous agents to issue multiple redundant tickets under transient chaos, multiplying monetary loss and corrupting inventory balances.
+
+\subsection{Fragility of Prompt-Space Policy Enforcement}
+Mainstream agent frameworks embed corporate policies, access controls, and operational constraints directly within the agent's natural-language system prompt (e.g., \textit{``Only issue refunds if the purchase occurred within the last 30 days, do not refund more than \$500, and ensure the username exists''}). 
+
+Extensive research in prompt injection and model drift has demonstrated that natural-language instructions provide zero mathematical guarantees of compliance~\cite{perez2022ignore}. Under adversarial prompt injections, confusing customer phrasing, complex multi-turn dialogues, or multi-item requests, the LLM frequently misinterprets temporal dates, fails basic arithmetic calculations, or bypasses policy restrictions entirely. Relying on prompt engineering to enforce enterprise financial security is an unacceptable architectural anti-pattern.
+
+\section{State of the Art and Industrial Urgency}
+\label{sec:intro_urgency}
+Recognizing the limitations of text-only metrics, recent research benchmarks such as Tau-Bench ($\tau$-bench)~\cite{yao2024taubench} and WebArena~\cite{zhou2023webarena} have pioneered environment-state evaluation, assessing whether an agent's interactions transition a simulated database or web interface from an initial state to an expected target state. 
+
+However, existing state-level benchmarks exhibit two critical deficiencies:
+\begin{enumerate}
+    \item \textbf{Clean-Room Assumptions:} Existing benchmarks evaluate agents in idealized, hermetic sandbox environments with zero simulated network packet drops, zero socket timeouts, and zero database commit latency. They fail to reflect the chaos and partial failures of production networks.
+    \item \textbf{Passive Evaluation Without Execution Defense:} Existing frameworks act solely as offline evaluators. They quantify an agent's failure rate, but provide no runtime architectural mechanism to intercept, prevent, or recover from these catastrophic failures in live production systems.
+\end{enumerate}
+
+Similarly, existing commercial and open-source guardrail frameworks—such as NVIDIA NeMo Guardrails~\cite{rebedea2023nemo}, Meta Llama Guard~\cite{inan2023llama}, and Guardrails AI—focus overwhelmingly on semantic content moderation, topical filtering, and syntactic JSON schema validation. None of these guardrails provide transactional boundary safety, cryptographic idempotency deduplication, write-ahead journaling, or claim-to-state discrepancy auditing. There is an urgent industrial necessity for a unified framework that combines \textit{active runtime execution safety} with \textit{chaos-tested, state-level evaluation}.
+
+\section{Project Objectives and Scope}
+\label{sec:intro_objectives}
+To address these fundamental limitations, this project designs, implements, and rigorously evaluates a novel two-part framework:
+\begin{itemize}
+    \item \textbf{EffectGuard (Execution Safety Gateway):} A lightweight, deterministic execution middleware positioned strictly at the tool-execution boundary of autonomous agents to govern irreversible, state-mutating actions.
+    \item \textbf{AgentSentinel (Reliability Evaluation Harness):} A state-level, hermetic evaluation testbed equipped with active chaos fault injection, frozen temporal anchoring, and precision multi-dimensional scoring metrics.
+\end{itemize}
+
+\subsection{Specific Technical Objectives}
+The concrete technical objectives of this research project are defined as follows:
+\begin{enumerate}
+    \item \textbf{Decouple Business Logic into Policy-as-Code (PAC):} Extract enterprise invariants (user validation, monetary bounds, maximum payout ceilings, unrefunded balance verification) from fragile prompt space into a deterministic, declarative configuration executed in pure Python code prior to any database mutation.
+    \item \textbf{Guarantee Transactional Idempotency Under Distributed Chaos:} Engineer a deterministic SHA-256 idempotency key generation engine and Write-Ahead Logging (WAL) journal that suppresses duplicate tool executions within conversational sessions.
+    \item \textbf{Implement Automated Verify-Before-Retry Recovery:} Design a recovery protocol that intercepts commit-timeout anomalies (such as HTTP 504 timeouts occurring after database commit), queries persistent storage to verify transaction status, and recovers committed receipts without triggering duplicate writes.
+    \item \textbf{Formulate a Formal Claim-vs-Ledger Auditor:} Formulate and implement a mathematical auditor that diffs the agent's natural-language claims and structured output assertions against physical database rows, classifying discrepancies into False Claims, Ghost Mutations, and Amount Drift.
+    \item \textbf{Conduct Scientific Matrix Ablation (C0 to C4):} Empirically measure the isolated and combined performance of naive execution, exponential backoff, idempotency keying, and verify-before-retry under controlled chaos network drop rates of 20\% and 35\%.
+\end{enumerate}
+
+\subsection{Scope of the Investigation}
+The scope of this project is focused on autonomous tool-calling agents implementing the ReAct framework operating over relational transactional databases within customer support and financial refund domains. The core agent is powered by an open-weight foundation model (\texttt{openai/gpt-oss-20b} hosted on Groq LPU infrastructure) communicating with a persistent SQLite database operating in high-concurrency Write-Ahead Logging (WAL) mode. The benchmark evaluation encompasses 25 golden test scenarios structured across five enterprise operational categories.
+
+\section{Genuine Technical Contributions}
+\label{sec:intro_contributions}
+This thesis establishes four genuine, evidence-backed technical contributions to the field of AI systems and agentic reliability:
+
+\begin{enumerate}
+    \item \textbf{The EffectGuard Architecture:} We present the formal architecture and lifecycle of an execution safety gateway for autonomous agents. EffectGuard operates transparently between LangChain/LangGraph agent runtimes and external tools, enforcing Policy-as-Code preconditions, transactional write-ahead logging, and deterministic cryptographic deduplication.
+    \item \textbf{Empirical Elimination of Chaos-Induced Duplicate Payouts:} Through systematic empirical testing under 20\% and 35\% network drop rates, we prove that while naive baseline agents suffer duplicate tickets and severe financial loss (\$125.00+ USD), EffectGuard completely eliminates duplicate state mutations, achieving \textbf{zero duplicate tickets, \$0.00 financial loss, and 100\% policy compliance}.
+    \item \textbf{Formalization of the Claim-vs-Ledger Metric:} We provide a formal taxonomy and automated auditing algorithm that Bridges the linguistic-to-database reality gap, mathematically identifying linguistic hallucinations, ghost side-effects, and monetary drift.
+    \item \textbf{Ablation of Distributed Recovery Mechanisms:} We present an empirical benchmark matrix comparing five architectural conditions (C0 to C4), proving that exponential backoff alone is insufficient to resolve commit-timeouts, and establishing that the synergy of SHA-256 idempotency keys and Verify-Before-Retry is strictly necessary to achieve zero financial loss while reducing end-to-end latency by 75.7\%.
+\end{enumerate}
+
+\section{Report Organization}
+\label{sec:intro_organization}
+The remainder of this report is organized into the following chapters:
+\begin{itemize}
+    \item \textbf{Chapter 2 (Literature Survey):} Reviews foundational and contemporary literature in autonomous agents, agent evaluation paradigms, safety guardrails, and distributed systems transactional guarantees, identifying the exact gaps addressed by this work.
+    \item \textbf{Chapter 3 (Requirement Engineering):} Formulates functional and non-functional requirements, presents the adversarial threat model, establishes formal system invariants, and specifies the operational hardware and software environment.
+    \item \textbf{Chapter 4 (System Design and Architecture):} Details the high-level system architecture, the EffectGuard gateway lifecycle, the SHA-256 idempotency formulation, write-ahead journaling, the Verify-Before-Retry state machine, the Claim Auditor formalization, and relational database schemas.
+    \item \textbf{Chapter 5 (System Implementation):} Explains the concrete implementation of the agent runtime, gateway interceptors, declarative policy engine, chaos fault injection engine, evaluation telemetry pipeline, and the automated 42-test verification suite.
+    \item \textbf{Chapter 6 (Experimental Results and Discussion):} Presents the empirical results from the 25 golden test cases across 20\% and 35\% chaos fault rates, details the C0–C4 ablation matrix, analyzes failure modes (including Groq 429 rate limits and regex edge cases), evaluates latency improvements, and quantifies financial risk.
+    \item \textbf{Chapter 7 (Conclusion and Future Work):} Summarizes the major research findings, evaluates the fulfillment of project objectives, discusses engineering limitations, and outlines future research directions for distributed multi-agent systems.
+\end{itemize}

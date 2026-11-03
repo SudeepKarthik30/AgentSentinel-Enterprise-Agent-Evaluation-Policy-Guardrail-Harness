@@ -1,0 +1,175 @@
+%% Chapter 5 — Implementation
+%% Adapted to EffectGuard Project per IIIT Manipur CS3201 Guidelines
+
+\section{Introduction and Implementation Architecture}
+
+Translating the theoretical concepts of state-level execution safety and distributed transactional recovery into a functioning software system requires a robust, modular implementation architecture. EffectGuard is implemented as a lightweight, zero-dependency middleware in Python 3.12, interfacing seamlessly with LangGraph agent runtimes and SQLite relational databases.
+
+This chapter details the concrete software engineering implementation of EffectGuard and the AgentSentinel evaluation harness. We explain the development stack, the temporal epoch freezing mechanism, the Policy-as-Code validator, the cryptographic SHA-256 idempotency engine, the write-ahead recovery protocol, the Claim-vs-Ledger Auditor, and the chaos fault injection harness.
+
+\section{Tools and Development Environment}
+
+The system implementation leverages production-grade software libraries and open-weight foundation models. Table~\ref{tab:tools} outlines the development tools, libraries, and their architectural roles.
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{|p{3.2cm}|p{2.2cm}|p{8.0cm}|}
+\hline
+\rowcolor{gray!15}
+\textbf{Tool / Library} & \textbf{Version} & \textbf{Operational Function} \\
+\hline
+Python & 3.12+ & Primary runtime environment for agent and gateway logic \\
+\hline
+LangGraph & 0.2+ & Stateful cyclic graph orchestration for ReAct loops \\
+\hline
+LangChain Core & 1.4+ & Tool interfaces, message models, and prompt binding \\
+\hline
+Groq SDK & 0.11+ & LPU cloud API client for token inference \\
+\hline
+SQLite 3 & 3.45+ & Embedded ACID relational storage configured in WAL mode \\
+\hline
+Pydantic & 2.6+ & Data validation, argument normalization, and structured outputs \\
+\hline
+FastAPI & 0.115+ & Asynchronous REST service and Server-Sent Events router \\
+\hline
+Uvicorn & 0.30+ & Asynchronous Server Gateway Interface (ASGI) web server \\
+\hline
+Pytest & 9.1+ & Hermetic automated test suite execution \\
+\hline
+python-dotenv & 1.0+ & Environment variable and configuration parsing \\
+\hline
+\end{tabular}
+\caption{Development tools, libraries, and runtime dependencies.}
+\label{tab:tools}
+\end{table}
+
+The operational runtime is governed by declarative environment parameters:
+\begin{itemize}
+    \item \texttt{GROQ\_API\_KEY}: The authentication token granting access to the Groq LPU inference cluster.
+    \item \texttt{BENCHMARK\_DATE}: The frozen temporal epoch (\texttt{2026-10-26}) used to evaluate all 30-day return eligibility windows.
+    \item \texttt{FAULT\_RATE}: The probabilistic chaos fault rate ($r = 0.20$ or $r = 0.35$) configuring dropped socket injection.
+    \item \texttt{DATABASE\_PATH}: The file path designating the persistent SQLite database instance (\texttt{store.db}).
+\end{itemize}
+
+\section{Deterministic Clock and Temporal Sandboxing}
+
+In real-world e-commerce systems, customer return policies are strictly governed by temporal windows (e.g., ``Items may be returned within 30 days of purchase''). A fundamental flaw in conventional agent benchmarks is reliance on the host machine's live system clock (\texttt{datetime.now()}). As calendar time elapses, test transactions that were valid on Day 28 organically cross the 30-day threshold on Day 31, causing benchmark test assertions to fail without any changes to the underlying codebase.
+
+To eliminate this temporal decay, EffectGuard introduces a \textbf{Deterministic Frozen Clock} abstraction implemented in \texttt{agent/tools.py}. The system anchors all temporal calculations to a fixed benchmark epoch:
+\begin{equation}
+    t_{\text{benchmark}} = \text{2026-10-26 00:00:00 UTC}
+\end{equation}
+When the agent invokes \texttt{get\_today\_date()}, the tool returns this fixed date and deterministically calculates the rolling 30-day return cutoff:
+\begin{equation}
+    t_{\text{cutoff}} = t_{\text{benchmark}} - 30\,\text{days} = \text{2026-09-26 00:00:00 UTC}
+\end{equation}
+During purchase evaluation, an item purchased on timestamp $t_{\text{purchase}}$ is strictly eligible if and only if $t_{\text{purchase}} \ge t_{\text{cutoff}}$. By sandboxing time, the benchmark guarantees 100\% mathematical reproducibility across arbitrary execution environments and calendar dates.
+
+\section{Policy-as-Code Engine Implementation}
+
+The Policy-as-Code engine (\texttt{effectguard/policy\_engine.py}) decouples enterprise invariants from the language model's prompt space into declarative, human-readable YAML specifications (\texttt{policy.yaml}).
+
+The policy file defines explicit validation rules:
+\begin{itemize}
+    \item \textbf{Identity Invariant:} Every transaction must originate from a verified customer record existing in the \texttt{users} table. Case-insensitive string normalization is applied to customer usernames.
+    \item \textbf{Positivity Invariant:} The requested refund amount must be strictly greater than zero ($A > 0.00$). Zero and negative refund amounts are rejected as invalid arithmetic expressions.
+    \item \textbf{Financial Safety Ceiling:} A per-transaction cap is enforced ($A \le \text{Rs.~}500.00$). Any request exceeding this threshold is blocked from automatic agent execution and routed to human supervisory review.
+    \item \textbf{Eligible Balance Ceiling:} The requested refund cannot exceed the cumulative sum of unrefunded items purchased within the 30-day window. Items marked \texttt{REFUNDED} are strictly excluded.
+\end{itemize}
+
+The Python validator executes these checks prior to database dispatch. If an invariant is violated, the engine halts the execution pipeline, generates an explanatory error payload indicating the exact violation, and returns this feedback to the agent. This prevents adversarial prompt injections from manipulating foundation models into approving illegal payouts.
+
+\section{SHA-256 Idempotency and WAL Journaling Implementation}
+
+The cryptographic deduplication engine (\texttt{effectguard/gateway.py}) prevents duplicate state mutations during distributed network retries.
+
+\subsection{Canonical Argument Serialization}
+In Python, dictionary representations do not guarantee identical JSON string serialization due to variable key ordering and formatting whitespace. For example, \texttt{\{"user": "sarah\_m", "amount": 70\}} and \texttt{\{"amount": 70, "user": "sarah\_m"\}} represent semantically identical calls but produce completely different raw byte streams. 
+
+To achieve deterministic hashing, EffectGuard applies \textbf{Lexicographical Canonical JSON Serialization}:
+\begin{equation}
+    \text{CanonicalJSON}(D) = \text{json.dumps}(D, \;\text{sort\_keys}=\text{True}, \;\text{separators}=(``,", ``:"))
+\end{equation}
+The derived SHA-256 idempotency key is computed by concatenating the session thread identifier, tool name, and canonical JSON string:
+\begin{equation}
+    k = \text{hashlib.sha256}\big(f``\{\tau_{\text{thread}}\}:\{T_{\text{name}}\}:\{\text{CanonicalJSON}(D)\}``.\text{encode}(\text{'utf-8'})\big).\text{hexdigest}()
+\end{equation}
+
+\subsection{Relational Write-Ahead Logging}
+Upon gateway startup, EffectGuard creates the persistent \texttt{execution\_journal} table in SQLite:
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Column} & \textbf{Type} & \textbf{Constraint} \\
+\hline
+\texttt{journal\_id} & TEXT & PRIMARY KEY (UUID4) \\
+\texttt{thread\_id} & TEXT & NOT NULL \\
+\texttt{idempotency\_key} & TEXT & UNIQUE, NOT NULL \\
+\texttt{tool\_name} & TEXT & NOT NULL \\
+\texttt{status} & TEXT & CHECK(\texttt{status} IN ('PENDING', 'COMMITTED', 'FAILED')) \\
+\texttt{created\_at} & TEXT & ISO-8601 Timestamp \\
+\hline
+\end{tabular}
+\end{center}
+
+Before invoking the underlying mutation executor, the gateway inserts a row with \texttt{status = 'PENDING'}. If the mutation succeeds, the status is updated to \texttt{'COMMITTED'}. This write-ahead journal provides complete state tracking across distributed retry attempts.
+
+\section{Verify-Before-Retry Protocol Implementation}
+
+The Verify-Before-Retry protocol resolves the distributed post-commit timeout dilemma. When an agent calls \texttt{issue\_refund\_ticket}, the database server may commit the transaction, but a network drop may prevent the return receipt from reaching the caller.
+
+The implementation algorithm operates as follows:
+\begin{enumerate}
+    \item The gateway wraps the raw database call inside a structured \texttt{try-except} block intercepting \texttt{TimeoutError} and connection dropped exceptions.
+    \item When a timeout is caught, the gateway halts execution and enters recovery mode.
+    \item Rather than re-executing the raw SQL write, the gateway queries the \texttt{tickets} table:
+    \begin{center}
+        \texttt{SELECT ticket\_id, amount FROM tickets WHERE idempotency\_key = ?}
+    \end{center}
+    \item If a ticket row matching key $k$ is found, the database committed the record prior to the network timeout. The gateway updates the journal status to \texttt{'COMMITTED'} and constructs a valid confirmation receipt from the stored row.
+    \item The confirmation receipt is returned directly to the agent runtime. The agent receives a valid receipt, bypassing the LLM retry loop and preventing duplicate tickets.
+    \item If no ticket row is found, the network dropped prior to database commit. The gateway executes the mutation safely once under the identical key $k$.
+\end{enumerate}
+
+\section{Claim-vs-Ledger Auditor Implementation}
+
+The Claim-vs-Ledger Auditor (\texttt{effectguard/claim\_auditor.py}) bridges the gap between conversational assertions and persistent physical ledgers. 
+
+The audit algorithm executes a dual-pass extraction strategy:
+\begin{enumerate}
+    \item \textbf{Primary Pass (Structured Schema):} The auditor inspects the agent's Pydantic response object for populated fields in the \texttt{claimed\_effects} list. If the agent structured output contains explicit ticket IDs and dollar amounts, these values are parsed directly.
+    \item \textbf{Secondary Pass (Natural Language Extraction):} If structured fields are unpopulated or malformed, the auditor applies regular expression patterns calibrated to extract monetary quantities (e.g., matching currency numbers such as \texttt{Rs.~[0-9]+(?:\textbackslash.[0-9]\{2\})?}) and ticket identifiers (e.g., \texttt{TICK-[A-Z0-9]\{4,8\}}) from unstructured conversational text.
+\end{enumerate}
+
+Once textual claims are extracted, the auditor queries \texttt{store.db} to retrieve physical rows committed during the session. The auditor calculates:
+\begin{align}
+    \Delta_{\text{tickets}} &= |\mathcal{C}_{\text{tickets}}| - |\mathcal{L}_{\text{tickets}}| \\
+    \Delta_{\text{amount}} &= \Big|\sum_{c \in \mathcal{C}} \text{Amount}(c) - \sum_{l \in \mathcal{L}} \text{Amount}(l)\Big|
+\end{align}
+
+If $\Delta_{\text{tickets}} > 0$ and $|\mathcal{L}| = 0$, the audit logs \texttt{FALSE\_CLAIM}. If $\Delta_{\text{tickets}} < 0$ and $|\mathcal{C}| = 0$, the audit logs \texttt{GHOST\_MUTATION}. If $\Delta_{\text{amount}} > 0.01$, the audit logs \texttt{AMOUNT\_DRIFT}. If claims perfectly match committed ledgers, the audit logs \texttt{AUDIT\_PASSED}.
+
+\section{AgentSentinel Chaos Evaluation Harness}
+
+The evaluation harness (\texttt{agent/fault\_injector.py} and \texttt{run\_benchmark\_matrix.py}) injects controlled network turbulence into the tool execution pipeline.
+
+The chaos monkey operates at two execution hooks:
+\begin{itemize}
+    \item \textbf{Pre-Execution Drop:} Simulates an upstream connection drop occurring before the tool interacts with the database. The hook throws a \texttt{ConnectionResetError} with probability $r$.
+    \item \textbf{Post-Commit Timeout (HTTP 504):} Simulates the critical failure boundary: the database write completes and commits to disk, but the return socket drops immediately thereafter. The hook raises a \texttt{TimeoutError("504 Gateway Timeout: Socket dropped post-commit")} with probability $r$.
+\end{itemize}
+
+The matrix runner automates evaluation across five architectural conditions:
+\begin{itemize}
+    \item \textbf{C0 (Naive Baseline):} Standard ReAct loop; retries blindly upon exception.
+    \item \textbf{C1 (Naive + Backoff):} ReAct agent equipped with exponential backoff delays ($1.0$\,s, $2.0$\,s, $4.0$\,s).
+    \item \textbf{C2 (Idempotency Only):} Employs SHA-256 keys to reject duplicate writes, but lacks Verify-Before-Retry.
+    \item \textbf{C3 (Verify-Before-Retry Only):} Employs database verification upon timeout, but lacks canonical idempotency keys.
+    \item \textbf{C4 (Full EffectGuard Gateway):} Complete five-layer gateway combining Policy-as-Code, SHA-256 keys, write-ahead journaling, and Verify-Before-Retry recovery.
+\end{itemize}
+
+\section{Chapter Summary}
+
+This chapter detailed the concrete engineering implementation of EffectGuard. We demonstrated how temporal epoch freezing eliminates benchmark test decay, how declarative Policy-as-Code invariants prevent prompt injection attacks, how canonical SHA-256 serialization and write-ahead journaling enforce idempotency, how Verify-Before-Retry resolves post-commit socket drops, and how the Claim-vs-Ledger Auditor diffs text against database reality. In the next chapter, we present the empirical results, ablation scorecards, latency benchmarks, and functional verification findings.

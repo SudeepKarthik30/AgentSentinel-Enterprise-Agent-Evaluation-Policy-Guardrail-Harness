@@ -1,0 +1,132 @@
+\section{Existing Solutions}
+
+RAG security has moved quickly since 2022. The subsections below cover the most relevant prior systems, ordered roughly by how directly each one influenced the design of MediCare Secure RAG.
+
+\subsection{PoisonedRAG --- Knowledge Corruption Attacks}
+Zou et al.\ \cite{poisonedrag2025} formalised knowledge poisoning in RAG systems at USENIX Security 2025. The attack satisfies two conditions at once: a \textit{retrieval condition} ensuring the adversarial document $d_{adv}$ ranks in the top-$k$ for target query $q$, and a \textit{generation condition} ensuring $d_{adv}$ persuades the LLM to output the attacker's chosen answer. Formally:
+\begin{equation}
+I\bigl(LLM(Q_i;\, E(Q_i;\, D \cup G)) = R_i\bigr) \quad \text{s.t.} \quad E(Q_i;\, D \cup G) = \text{RETRIEVE}(Q_i, f_Q, f_T, D \cup G)
+\end{equation}
+where $I(\cdot)$ is an indicator function, $Q_i$ is the target question, $R_i$ is the malicious target answer, and $G$ is the set of poisoned texts. Evaluations on databases of up to 8.8 million documents (MS-MARCO) showed a 90\% Attack Success Rate (ASR) with only five injected documents, and 97\% ASR on the Natural Questions (NQ) dataset under the black-box setting.
+
+\subsection{Indirect Prompt Injection --- Greshake et al.}
+Greshake et al.\ \cite{greshake2023} named and documented Indirect Prompt Injection (IPI) as an ``Instruction-Data Confusion'' vulnerability. Instructions embedded in retrieved web pages, PDFs, or database records can override the LLM's system-level directives. Real-world tests showed full system compromise, PII exfiltration, and persistent multi-turn manipulation were all achievable through retrieved context alone. This work is the direct academic basis for Layer 3 (Prompt Hardening).
+
+\subsection{TrustRAG --- Embedding-level clustering defence}
+TrustRAG \cite{trustrag2025} uses cosine similarity analysis on retrieved embeddings to isolate suspicious documents. By grouping retrieved embeddings and flagging compact outlier clusters as potential coordinated injections, TrustRAG reduced poisoning ASR without needing ground-truth labels. Layer 5 (Embedding Anomaly Detection) in MediCare draws directly on this approach.
+
+\subsection{ALGEN --- Embedding Inversion Attacks}
+Chen et al.\ \cite{algen2025} showed text can be reconstructed from its embedding vector with as few as 1{,}000 training samples in a black-box setting. For healthcare RAG systems this means a cross-tenant privacy risk: if vector embeddings of patient records are queryable, an adversary could reconstruct sensitive medical text from raw similarity scores. ALGEN's findings support the case for access-controlled retrieval (Layer 2).
+
+\subsection{FilterRAG and ML-FilterRAG}
+FilterRAG \cite{filterrag2025} introduces a statistical filtration mechanism operating between retrieval and generation. It uses a ``Freq-Density'' measure --- quantifying the concentration of query-answer word overlaps in a document --- to differentiate adversarial texts from clean context. Documents with unnaturally high term density for a specific outcome are flagged and removed before generation. This work validates the architectural placement of Layer 5 in the MediCare pipeline.
+
+\subsection{OpenRAG-Soc --- IPI Benchmarking}
+OpenRAG-Soc \cite{openragsoc2025} provides a compact, reproducible benchmark for evaluating RAG systems under indirect prompt injection and retrieval poisoning. Its three-layer defence approach (HTML sanitisation, Unicode normalisation, and attribution-gated answering) aligns closely with Layers 1 and 4 of MediCare. Notably, it standardises end-to-end evaluation from ingestion to generation using rank shift metrics.
+
+\subsection{Microsoft Spotlighting}
+Microsoft \cite{microsoftspotlighting} formalised ``Spotlighting'' --- prefixing all retrieved content with consistent delimiters and instructing the model to treat content between those delimiters as data, not instructions. Applied to GPT-family models, Spotlighting reduced IPI success rates from 50\% to below 2\%. This is the industry standard basis for Layer 3 (Prompt Hardening).
+
+\subsection{CaMeL --- Dual-LLM Isolation}
+The CaMeL technique \cite{camel2025} separates control flow from data flow by using two LLMs: a Privileged LLM (P-LLM) that processes trusted instructions and a Quarantined LLM (Q-LLM) that parses untrusted retrieved input into structured formats without tool access. This represents the high-end realisation of prompt hardening and output validation, effectively creating a ``quarantine zone'' for retrieved context.
+
+\subsection{Kiteworks HIPAA-Compliant RAG Framework}
+Kiteworks \cite{kiteworks2025} addresses the regulatory and access-control requirements for medical RAG systems, specifically cross-tenant leakage. The framework proposes identity-based authentication tied to Electronic Health Record (EHR) permissions, ensuring physicians retrieve only records they are authorised to access. This validates the legal necessity of Layer 2 (RBAC) as a HIPAA Security Rule requirement.
+
+\subsection{Deconvolute Labs --- RAG Security Architecture}
+The Deconvolute Labs technical report \cite{deconvolute2026}, released in March 2026, documents a structured RAG security lab explicitly implementing a five-layer pipeline (Ingestion Sanitization, Access-Controlled Retrieval, Prompt Hardening, Output Monitoring, and Embedding Anomaly Detection) against knowledge poisoning, IPI, and cross-tenant leakage. This report represents the closest architectural parallel to MediCare Secure RAG.
+
+\textbf{MediCare extends Deconvolute Labs 2026 in three specific ways:} (1) the knowledge base consists exclusively of NHS/WHO/CDC clinical guidelines, which enables attack scenarios with direct medical safety consequences --- wrong drug dosages, unsafe heart rate thresholds --- that a general-purpose security lab cannot replicate; (2) MediCare introduces the CRIR metric, a measurable retrieval integrity assessment absent from the Deconvolute evaluation, which reports only qualitative defence effectiveness; (3) MediCare provides a live three-condition Streamlit demonstration bridging the gap between security research methodology and clinical educational accessibility.
+
+\section{Relevant Theories and Models}
+
+\subsection{OWASP LLM Top 10 (2025)}
+The OWASP LLM Top 10 for 2025 \cite{owasp2025} classifies the threats targeted by MediCare under two categories:
+\begin{itemize}
+    \item \textbf{LLM01:2025 --- Prompt Injection} (Critical): Occurs when attackers embed malicious instructions to override system prompts, directly enabling Indirect Prompt Injection attacks.
+    \item \textbf{LLM08:2025 --- Vector and Embedding Weaknesses} (Medium): Encompasses corpus poisoning, embedding inversion, and retrieval manipulation --- all three of which are simulated in the MediCare attack suite.
+\end{itemize}
+
+\subsection{MITRE ATLAS Threat Framework}
+The MITRE ATLAS framework \cite{mitreatlas} provides the adversarial taxonomy used for threat modelling:
+\begin{itemize}
+    \item \textbf{AML.T0043} --- Craft Adversarial Data: Creating adversarial examples for corpus poisoning.
+    \item \textbf{AML.T0051} --- LLM Prompt Injection: Direct and indirect injection to override model behaviour.
+    \item \textbf{AML.T0020} --- Poison Training/Corpus Data: Corrupting knowledge sources to manipulate outputs.
+\end{itemize}
+\section{Deep Comparison of Key Prior Work}
+
+\subsection{Synthesis and Design Rationale}
+
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+
+\renewcommand{\arraystretch}{0.95} % slightly more compact rows
+
+\begin{center}
+\small
+\begin{longtable}{|p{2.6cm}|p{1.5cm}|p{1.2cm}|p{1.0cm}|p{1.5cm}|p{2.4cm}|}
+\caption{Comparison of MediCare Secure RAG with Similar RAG Security Systems.}
+\label{tab:comparison} \\
+\hline
+\rowcolor{gray!15}
+\textbf{System} & \textbf{Domain} & \textbf{Poisoning} & \textbf{IPI} & \textbf{Leakage} & \textbf{Primary Metric} \\
+\hline
+\endfirsthead
+\multicolumn{6}{l}{\small\textit{Table \thetable{} continued from previous page}} \\[2pt]
+\hline
+\rowcolor{gray!15}
+\textbf{System} & \textbf{Domain} & \textbf{Poisoning} & \textbf{IPI} & \textbf{Leakage} & \textbf{Primary Metric} \\
+\hline
+\endhead
+\hline
+\multicolumn{6}{r}{\small\textit{Continued on next page}} \\
+\endfoot
+\hline
+\endlastfoot
+
+MediCare (Ours) & Healthcare & Yes & Yes & Yes (RBAC) & CRIR \\
+\hline
+PoisonedRAG & General & Yes & No & No & ASR \\
+\hline
+Greshake et al. & General & No & Yes & No & ASR \\
+\hline
+TrustRAG & General & Yes & No & No & ASR \\
+\hline
+FilterRAG & General & Yes & No & No & Freq-Density \\
+\hline
+OpenRAG-Soc & Social/Web & Yes & Yes & No & $\Delta$MRR \\
+\hline
+Deconvolute Labs & General & Yes & Yes & Yes & Measured Defense \\
+\hline
+Kiteworks & Healthcare & No & No & Yes (HIPAA) & Compliance \\
+\hline
+
+\end{longtable}
+\end{center}
+\section{Comparison of Similar Systems}
+
+Table~\ref{tab:comparison} above provides the quantitative feature comparison. The subsections below explain the design choices behind the two most important differentiations.
+
+\subsection{MediCare vs.\ PoisonedRAG}
+PoisonedRAG shows that five injected documents can achieve 97\% ASR. MediCare's response is to make retrieval trust conditional. Enforcing RBAC at the retrieval layer and running embedding anomaly detection breaks both the retrieval condition and the generation condition that PoisonedRAG requires to succeed simultaneously.
+
+\subsection{MediCare vs.\ Deconvolute Labs 2026}
+The Deconvolute Labs 2026 five-layer architecture is the closest prior work. MediCare's differentiating contribution is domain specificity: a poisoning attack producing ``8,000 mg paracetamol/day is safe'' is not merely an information integrity violation but a potential patient safety incident. CRIR provides the measurement tool to track this distinction at retrieval time, without ground-truth labels.
+
+\section{Identified Gaps Addressed by This Project}
+
+Based on the literature synthesis, five key gaps are addressed:
+\begin{enumerate}
+    \item \textbf{Healthcare-Specific Corpus:} No prior published work evaluates RAG security attacks exclusively on NHS, CDC, and WHO clinical guidelines.
+    \item \textbf{Combined Three-Attack Evaluation:} Existing papers address poisoning or injection or leakage in isolation. MediCare evaluates all three simultaneously under controlled conditions.
+    \item \textbf{RBAC at Vector Retrieval Layer:} No peer-reviewed paper provides a formal security evaluation of RBAC enforced at the ChromaDB metadata filtering stage in a healthcare context.
+    \item \textbf{CRIR Metric:} Existing benchmarks use binary ASR or rank-shift metrics. CRIR provides a three-component assessment: binary contamination flag, retrieval precision, and composite risk score.
+    \item \textbf{Live Interactive Demo:} No public repository presents a three-condition (clean vs.~poisoned vs.~defended) Streamlit-based healthcare RAG attack demonstration.
+\end{enumerate}
+
+\section{Conclusion of Literature Survey}
+
+Two things stand out from reviewing this literature. First, the five-layer defence pattern is not novel speculation --- it has independent confirmation from the Deconvolute Labs 2026 report, TrustRAG, and the OWASP LLM Top 10. The individual mechanisms each have documented academic or industry precedent.
+
+Second, no published work before this project applies the combined architecture to a \textbf{healthcare-specific corpus} with a \textbf{dedicated retrieval integrity metric} (CRIR) evaluated over \textbf{100 queries} across three independently controlled conditions. The gap is not in the existence of the techniques but in their simultaneous combination on clinical data with a retrieval-level metric that works without ground-truth labels. That is the primary research contribution of MediCare Secure RAG.

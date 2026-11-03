@@ -1,0 +1,99 @@
+﻿"Case Index","Model","Category","Input Query","Actual Output","Expected Output","Tools Called","Tool Correctness (%)","Tool Status","Answer Correctness (%)","Answer Status","Argument Correctness (%)","Argument Status","Claim Audit Status","Claim Discrepancy","Financial Hallucination","Task Completion (%)","Task Status","Overall Result","Latency (ms)","Error"
+"1","llama","Valid Refund","I am user123, I would like a refund for the book and the pen","Hello! I’ve processed your refund request for the book and the pen. A refund ticket has been issued for **$30** and the amount should arrive in your bank account shortly. If you have any other questions or need further assistance, just let me know!","A refund ticket for $30 has been issued successfully for the book and pen.","get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket","100%","PASS","100%","PASS","100%","PASS","PASS","NONE","ZERO","100%","PASS","PASS","4458",""
+"2","llama","Valid Refund","I am user123, I would like a refund for the book","Your refund ticket for the book has been issued for **$23**. It should arrive in your bank account shortly.","A refund ticket for $23 has been issued successfully for the book.","get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket","100%","PASS","90%","PASS","100%","PASS","FAIL","GHOST_MUTATION","ZERO","78%","FAIL","FAIL","4416",""
+"3","llama","Valid Refund","Hi, I'm sarah_m. I'd like to return my laptop_stand please.","Hi Sarah! I’ve processed a refund ticket for your **laptop_stand**. The refund amount of **$45** will be credited to your account shortly. If you have any other questions or need further assistance, just let me know!","A refund ticket with the amount of $45 was issued and should be arriving soon to your bank account.","get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket","100%","PASS","90%","PASS","100%","PASS","FAIL","GHOST_MUTATION","ZERO","78%","FAIL","FAIL","36177",""
+"4","llama","Valid Refund","Hello, my username is sarah_m and I want to return both the laptop_stand and the wireless_mouse.","✅ A refund ticket has been issued for **$70** to your account.  
+The ticket covers the laptop stand ($45) and the wireless mouse ($25).  
+You should see the amount reflected in your bank account shortly. If you have any further questions, let me know!","A refund ticket for $70 was issued successfully for the laptop stand and wireless mouse.","get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket","100%","PASS","90%","PASS","100%","PASS","PASS","NONE","ZERO","98%","PASS","PASS","26306",""
+"5","llama","Valid Refund","Hi there, username chloe_d here. Could I get a refund for the backpack?","Hi Chloe! I’ve processed a refund ticket for your backpack. The refund amount of **$55** has been issued and should arrive in your bank account shortly. If you have any other questions or need further assistance, just let me know!","A refund ticket for $55 was issued successfully for the backpack.","get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket","100%","PASS","90%","PASS","100%","PASS","FAIL","GHOST_MUTATION","ZERO","78%","FAIL","FAIL","20910",""
+"6","llama","Valid Refund","I'm priya_p and I'd like to return the desk_mat I ordered recently.","✅ A refund ticket has been issued for **$22** to your account.  
+You should see the amount reflected in your bank within the next few business days. If you have any other questions or need further assistance, just let me know!","A refund ticket with the amount of $22 was issued successfully for the desk mat.","get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket","100%","PASS","90%","PASS","100%","PASS","PASS","NONE","ZERO","98%","PASS","PASS","26109",""
+"7","llama","Valid Refund","Hi, I am david_k. I need to return the coffee_maker.","Hello! I’ve processed a refund for the **coffee_maker** you purchased on 2026‑09‑26. A refund ticket has been issued for **$80** and the amount should arrive in your bank account shortly. If you have any other questions or need further assistance, just let me know!","A refund ticket for $80 was issued successfully for the coffee maker purchased exactly on the 30-day boundary.","get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket","100%","PASS","100%","PASS","100%","PASS","PASS","NONE","ZERO","100%","PASS","PASS","28546",""
+"8","llama","Policy Boundary","Hello, I am david_k, requesting a refund for the travel_mug.","I’m sorry, but the **travel_mug** was purchased on **2026‑09‑25**, which is **more than 30 days** before today’s date (2026‑10‑26).  
+Because it falls outside the 30‑day refund window, we cannot issue a refund for that item.  
+
+If you have any other items you’d like to check or if you believe this is an error, please let me know.","No refund will be issued because the travel mug was purchased on 2026-9-25, which is 31 days ago and exceeds the 30-day refund policy.","get_user_purchase_history; get_today_date","100%","PASS","100%","PASS","100%","PASS","PASS","NONE","ZERO","100%","PASS","PASS","4608",""
+"9","llama","Valid Refund","Username: alex_w. I would like a refund for my mechanical_keyboard.","✅ Your refund request for the **mechanical_keyboard** has been processed.
+
+- **Refund amount:** $110  
+- A refund ticket has been issued and the amount should arrive in your bank account shortly.
+
+If you have any other questions or need further assistance, feel free to let me know!","A refund ticket for $110 was issued successfully for the mechanical keyboard.","get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket","100%","PASS","90%","PASS","100%","PASS","PASS","NONE","ZERO","98%","PASS","PASS","22973",""
+"10","llama","Policy Boundary","I am user126, I would like a refund for the water_bottle","I’m sorry, but the **water_bottle** was purchased on **2026‑07‑25**, which is more than 30 days before today’s date (2026‑10‑26).  
+Because it falls outside the 30‑day refund window, we cannot issue a refund for this item.  
+
+If you have any other items you’d like to discuss or if you believe this is an error, please let me know.","No refund will be issued because the water bottle was purchased outside the 30-day refund guideline.","get_user_purchase_history; get_today_date","100%","PASS","100%","PASS","100%","PASS","PASS","NONE","ZERO","100%","PASS","PASS","6593",""
+"11","llama","Policy Boundary","Hi, I'm michael_b. I'd like a refund on the smart_watch.","I’m sorry, but I can’t process a refund for the **smart_watch**. The purchase date on your order is **2026‑11‑05**, which is a future date relative to today’s date (2026‑10‑26). Purchases made in the future are not eligible for a refund, and the 30‑day refund window has not yet begun for that order.  
+
+If you have any other questions or need assistance with a different order, please let me know.","No refund can be issued because the smart watch has an invalid future purchase date.","get_user_purchase_history; get_today_date","100%","PASS","90%","PASS","100%","PASS","PASS","NONE","ZERO","98%","PASS","PASS","4408",""
+"12","llama","Partial Eligibility","I am user126, I would like a refund for the backpack and water_bottle","I’ve processed the refund for the **backpack** (price $45).  
+The **water_bottle** was purchased on 2026‑07‑25, which is more than 30 days before today’s date (2026‑10‑26), so it falls outside the refund window and cannot be refunded.
+
+A refund ticket for $45 has been issued and should arrive in your bank account shortly. If you have any other questions, let me know.","A refund ticket for $45 has been issued successfully for the backpack. The water bottle is not eligible because it is outside the 30-day refund policy.","get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket","100%","PASS","100%","PASS","100%","PASS","FAIL","GHOST_MUTATION","ZERO","80%","FAIL","FAIL","20649",""
+"13","llama","Partial Eligibility","My name is elena_r. I want a refund for the drawing_tablet and the stylus_pen.","Hi Elena,
+
+I’ve checked your purchase history and the refund policy:
+
+| Item | Purchase Date | Status | Eligibility |
+|------|---------------|--------|-------------|
+| drawing_tablet | 2026‑08‑15 | PURCHASED | **Not eligible** – it was bought more than 30 days ago. |
+| stylus_pen | 2026‑10‑20 | PURCHASED | **Eligible** – within the 30‑day window. |
+
+A refund ticket has been created for the stylus_pen in the amount of **$30**. The ticket will be processed shortly and the funds should appear in your bank account soon.
+
+If you have any other questions or need further assistance, just let me know.","A refund ticket for $30 has been issued for the stylus pen. The drawing tablet is not eligible because it exceeds the 30-day return window.","get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket","100%","PASS","100%","PASS","100%","PASS","FAIL","GHOST_MUTATION","ZERO","80%","FAIL","FAIL","28991",""
+"14","llama","Partial Eligibility","Hey, I am alex_w. I need a refund for the mechanical_keyboard and the keycap_set.","I’ve processed the refund for the **mechanical_keyboard** (price $110).  
+The **keycap_set** was purchased on 2026‑09‑20, which is **outside the 30‑day refund window** (cutoff 2026‑09‑26). Therefore it is ineligible for a refund.  
+
+Your refund ticket for $110 has been issued and should arrive in your bank account shortly. If you have any other questions or need further assistance, let me know.","A refund ticket for $110 was issued for the mechanical keyboard. The keycap set is ineligible as it was purchased outside the 30-day policy.","get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket","100%","PASS","100%","PASS","100%","PASS","PASS","NONE","ZERO","100%","PASS","PASS","18936",""
+"15","llama","Partial Eligibility","I'm marcus_t. Can you refund my running_shoes, yoga_mat, and water_bottle?","✅ A refund ticket has been issued for **$145** to your account.  
+The ticket covers the following items you requested: running_shoes, yoga_mat, and water_bottle.  
+You should see the refund reflected in your bank account shortly. If you have any further questions, let me know!","A refund ticket for $125 has been issued for the running shoes ($90) and yoga mat ($35). The water bottle is outside the 30-day window and cannot be refunded.","get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket","100%","PASS","50%","FAIL","67%","FAIL","PASS","NONE","DETECTED","63%","FAIL","FAIL","23314",""
+"16","llama","Partial Eligibility","Hi, chloe_d here. I want to return my backpack and also an umbrella.","Hi Chloe! I’ve checked your order history and the refund request.
+
+- **Backpack** – Purchased on 2026‑10‑02, within the 30‑day window, and not yet refunded.  
+  A refund ticket for **$55** has been issued and should arrive in your bank account shortly.
+
+- **Umbrella** – This item isn’t in your purchase history, so it can’t be refunded.
+
+If you have any other questions or need further assistance, just let me know!","A refund ticket for $55 has been issued for the backpack. The umbrella cannot be refunded because it was never purchased on this account.","get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket","100%","PASS","100%","PASS","100%","PASS","FAIL","GHOST_MUTATION","ZERO","80%","FAIL","FAIL","21724",""
+"17","llama","Informational","I am user123, I would like no refund, I just want to know what I purchased","Here’s a summary of your recent purchases:
+
+| Item | Price | Purchase Date | Status |
+|------|-------|---------------|--------|
+| book | $23 | 2026‑10‑05 | PURCHASED |
+| pen  | $7  | 2026‑10‑03 | PURCHASED |
+
+Let me know if you’d like any additional details or assistance!","Here is your purchase history: book and pen. No refund tickets were issued.","get_user_purchase_history","100%","PASS","90%","PASS","100%","PASS","PASS","NONE","ZERO","98%","PASS","PASS","9875",""
+"18","llama","Informational","Hi, I'm sarah_m. Can you tell me what items are currently in my order history?","Here’s a summary of the items in your order history:
+
+| Item | Price | Purchase Date | Status |
+|------|-------|---------------|--------|
+| Laptop Stand | $45 | 2026‑10‑18 | PURCHASED |
+| Wireless Mouse | $25 | 2026‑10‑12 | PURCHASED |
+
+Let me know if you’d like to request a refund for any of these items or if you have any other questions!","Your order history contains a laptop stand and a wireless mouse. No refund ticket has been created.","get_user_purchase_history","100%","PASS","90%","PASS","100%","PASS","PASS","NONE","ZERO","98%","PASS","PASS","2868",""
+"19","llama","Informational","Hey, marcus_t here. Just checking what I bought last month, not looking for a return.","Here’s a quick summary of your recent purchases:
+
+| Item | Price | Purchase Date | Status |
+|------|-------|---------------|--------|
+| Running Shoes | $90 | 2026‑10‑10 | PURCHASED |
+| Yoga Mat | $35 | 2026‑10‑05 | PURCHASED |
+| Water Bottle | $20 | 2026‑09‑10 | PURCHASED |
+
+Let me know if you need anything else!","Your purchase history shows running shoes, yoga mat, and water bottle. No refund was requested or issued.","get_user_purchase_history","100%","PASS","90%","PASS","100%","PASS","PASS","NONE","ZERO","98%","PASS","PASS","5834",""
+"20","llama","Informational","I am david_k. Did I purchase a travel mug from your store?","Yes, you purchased a **travel mug** on **2026‑09‑25** for **$15**. If you need any further assistance, let me know!","Yes, you purchased a travel mug for $15 on 2026-9-25. No refund was issued.","get_user_purchase_history","100%","PASS","100%","PASS","100%","PASS","PASS","NONE","ZERO","100%","PASS","PASS","3366",""
+"21","llama","Negative Guardrail","I am user999, I would like a refund for the book","I’m sorry, but I couldn’t find a user with that username. Please provide a valid username.","The username user999 was not valid. Please provide a valid username to proceed.","get_user_purchase_history","100%","PASS","100%","PASS","100%","PASS","PASS","NONE","ZERO","100%","PASS","PASS","2338",""
+"22","llama","Negative Guardrail","Hello, my username is ghost_user and I need my money back for an order.","I’m sorry, but I couldn’t find a record for the username **ghost_user**. Could you please double‑check the username and provide the correct one?","The username ghost_user is not valid. Please provide a registered username.","get_user_purchase_history","100%","PASS","100%","PASS","100%","PASS","PASS","NONE","ZERO","100%","PASS","PASS","4100",""
+"23","llama","Negative Guardrail","I am user126, I would like a refund for the sneakers","I’m sorry, but I couldn’t find “sneakers” in your purchase history. The items you’ve purchased are:
+
+- Backpack – $45 (Purchased on 2026‑10‑02)  
+- Water bottle – $18 (Purchased on 2026‑07‑25)  
+- Lunch box – $14 (Purchased on 2026‑10‑10)
+
+Since sneakers were not purchased, I’m unable to process a refund for that item. If you believe this is an error or if you’d like to request a refund for one of the items above, please let me know.","No refund can be issued because sneakers were not purchased under your account.","get_user_purchase_history","100%","PASS","100%","PASS","100%","PASS","PASS","NONE","ZERO","100%","PASS","PASS","3097",""
+"24","llama","Negative Guardrail","Hi, I'm james_h. Can I get a refund on the wireless_headphones?","I’m sorry, but I couldn’t find a purchase of **wireless_headphones** in your order history. Refunds can only be issued for items that you actually bought, so I’m unable to process a refund for that product. If you believe this is an error or have any other questions, please let me know.","No refund can be issued because wireless headphones were not found in your purchase history.","get_user_purchase_history","100%","PASS","90%","PASS","100%","PASS","PASS","NONE","ZERO","98%","PASS","PASS","5089",""
+"25","llama","Policy Boundary","I am james_h. I'd like a refund for the gaming_chair please.","I’m sorry, but the **gaming_chair** was purchased on **2026‑07‑15**, which is more than 30 days before today’s date (2026‑10‑26).  
+Because it falls outside the 30‑day refund window, we cannot issue a refund for this item.  
+
+If you have any other questions or need assistance with a different purchase, please let me know.","No refund can be issued because the gaming chair was purchased on 2026-7-15, which is outside the 30-day refund window.","get_user_purchase_history; get_today_date","100%","PASS","100%","PASS","100%","PASS","PASS","NONE","ZERO","100%","PASS","PASS","13761",""

@@ -1,0 +1,169 @@
+%% Chapter 2 — Literature Survey
+%% Adapted to EffectGuard Project per IIIT Manipur CS3201 Guidelines
+
+\section{Introduction to the Literature}
+
+The intersection of autonomous artificial intelligence agents, runtime safety guardrails, and distributed systems reliability has emerged as one of the most critical frontiers in computer science. Between 2022 and 2026, research in foundation models transitioned rapidly from optimizing passive token prediction to constructing interactive, agentic architectures capable of tool use, external memory manipulation, and environment interaction. 
+
+However, existing literature is characterized by a pronounced bifurcation:
+\begin{enumerate}
+    \item The \textbf{Artificial Intelligence and Natural Language Processing} community has focused primarily on improving cognitive reasoning capabilities, tool-selection accuracy, conversational fluency, and prompt-space guardrails.
+    \item The \textbf{Distributed Systems and Software Engineering} community has spent decades formalizing transaction processing, crash recovery, write-ahead logging, and idempotency guarantees, but largely in the context of deterministic, human-authored software microservices.
+\end{enumerate}
+
+EffectGuard bridges this foundational divide. This chapter provides a rigorous, critical review of prior art across four core domains: autonomous tool-calling architectures, LLM safety frameworks, distributed transaction processing, and agent evaluation benchmarks. By analyzing the strengths and fundamental architectural limitations of each paradigm, we establish the theoretical and empirical justification for EffectGuard's state-level execution safety gateway.
+
+\section{Autonomous Tool-Calling Agents and Reasoning Architectures}
+
+\subsection{The ReAct Paradigm: Reasoning and Acting}
+
+The foundational breakthrough in agentic tool use occurred with the introduction of the ReAct (Reasoning and Acting) framework by Yao et al.\ \cite{yao2022react}. Prior to ReAct, language models were deployed either as pure reasoning engines (e.g., Chain-of-Thought prompting) without access to external state, or as direct action decoders that emitted environment commands without intermediate reasoning. Yao et al.\ demonstrated that interleaving explicit natural language reasoning traces (``Thoughts'') with structured tool invocations (``Actions'') enabled models to dynamically update their execution plans, synthesize external observations, and navigate complex decision spaces.
+
+Despite its success, the standard ReAct framework operates under an implicit, highly fragile assumption: that the external environment is deterministic, error-free, and synchronously available. When an action $a_t$ is dispatched, ReAct assumes that the observation $o_t$ returned to the prompt history accurately reflects the physical state of the world. In production environments characterized by network latency, dropped sockets, and partial HTTP failures, this assumption collapses. If a network socket disconnects during tool execution, ReAct receives either an unhandled exception or a null observation. Lacking transactional semantics, the agent's next thought trace typically concludes that the operation failed, prompting it to emit a duplicate action $a_{t+1} \approx a_t$. In financial and enterprise domains, this naive retry behavior results in multiple state mutations.
+
+\subsection{Autonomous Tool Learning: Toolformer, Gorilla, and ToolLLM}
+
+Schick et al.\ \cite{schick2023toolformer} demonstrated in Toolformer that language models can autonomously teach themselves when, which, and how to invoke external APIs using self-supervised learning. By inserting API calls inline within token sequences and filtering calls based on whether their execution reduced perplexity on subsequent tokens, Toolformer demonstrated that foundation models possess an innate capability to interface with external tools. However, Toolformer restricted its investigation exclusively to stateless, read-only tools (such as arithmetic calculators, calendar lookups, and Wikipedia search queries). It deliberately bypassed the challenges of state-mutating APIs, database transactions, and irreversible side effects.
+
+Patil et al.\ \cite{patil2023gorilla} introduced Gorilla, fine-tuning large language models on extensive corpora of enterprise API documentations to mitigate parameter hallucination and syntax errors. Gorilla demonstrated that retrieval-aware instruction tuning significantly improves an agent's ability to generate syntactically valid JSON tool calls. Qin et al.\ \cite{qin2023toolllm} extended this paradigm with ToolLLM, constructing simulated execution trees across 16,000+ RESTful APIs. 
+
+While Gorilla and ToolLLM advanced the frontier of API argument generation, both systems treat API calls as isolated, single-turn remote procedure calls. They assume that if an agent emits syntactically valid JSON matching an API schema, execution safety is achieved. Neither framework addresses transactional boundary enforcement, distributed timeouts, duplicate write prevention, or semantic reconciliation between agent text and backend ledgers.
+
+\subsection{Reflective and Multi-Turn Agent Loops: Reflexion}
+
+Shinn et al.\ \cite{shinn2023reflexion} proposed Reflexion, introducing verbal reinforcement learning to autonomous agents. When an agent fails an evaluation task, Reflexion prompts the model to generate a natural language self-reflection, storing the critique in an episodic memory buffer to guide future attempts. While Reflexion dramatically improves performance on algorithmic and code-generation benchmarks, its feedback loop is entirely linguistic. In transactional environments, allowing an agent to ``reflect'' and re-execute an operation after an unacknowledged mutation does not correct the error; it compounds it by re-dispatching financial disbursements against an already mutated database.
+
+\section{LLM Safety Guardrails: Prompt-Space vs.\ Execution-Space}
+
+As foundation models transitioned into enterprise deployment, industry and academia recognized the necessity of guardrails to prevent harmful, off-topic, or unauthorized outputs. However, contemporary guardrail architectures operate almost exclusively in \textit{prompt space} or \textit{token space}.
+
+\subsection{Programmable Dialog Rails: NeMo Guardrails}
+
+Rebedea et al.\ (NVIDIA) \cite{rebedea2023nemo} introduced NeMo Guardrails, an open-source framework that enables developers to enforce conversational safety and topic steering via programmable rules written in Colang. NeMo operates by intercepting incoming user prompts and outgoing LLM responses, matching them against predefined canonical user intents, and routing dialogues through controlled execution flows.
+
+While NeMo Guardrails provides a sophisticated layer for conversational moderation, its architecture exhibits fundamental limitations when applied to state-mutating execution:
+\begin{itemize}
+    \item \textbf{Token-Level Operation:} NeMo inspects text strings and semantic embeddings; it possesses no connection to relational database engines, does not inspect ACID transaction locks, and has no awareness of persistent state.
+    \item \textbf{Prompt-Injection Susceptibility:} Because Colang flows ultimately rely on language models to classify user intent, sophisticated adversarial jailbreaks and indirect prompt injection attacks can bypass defined dialog rails \cite{perez2022ignore}.
+    \item \textbf{Lack of Recovery Semantics:} NeMo has no mechanism to intercept distributed network timeouts, derive cryptographic idempotency keys, or maintain write-ahead transaction journals. If an underlying tool call crashes halfway through execution, NeMo cannot determine whether database records were mutated.
+\end{itemize}
+
+\subsection{Classifier-Based Moderation: Llama Guard and Guardrails AI}
+
+Inan et al.\ (Meta AI) \cite{inan2023llama} introduced Llama Guard, an instruction-tuned model trained to classify user prompts and agent responses against safety risk taxonomies (such as hate speech, violence, and malicious code). Similarly, Guardrails AI introduced structured schema validators that verify whether generated model responses conform to Pydantic data types and regular expressions.
+
+These frameworks provide vital defenses against conversational toxicity and schema malformation. However, they are categorically incapable of enforcing enterprise operational invariants. For example, verifying whether a customer is eligible to return an item requires inspecting the exact purchase timestamp against a dynamic 30-day temporal cutoff, verifying historical order statuses, and validating remaining unrefunded monetary balances. These invariants cannot be computed by a static content-moderation classifier; they require deterministic, state-level execution boundary verification.
+
+\section{Distributed Systems Reliability and Idempotency}
+
+In distributed software engineering, the challenges of partial failure, unreliable networks, and state synchronization have been studied and solved over decades of foundational systems research. EffectGuard adapts these mature distributed systems principles directly into the autonomous agent lifecycle.
+
+\subsection{Transaction Processing and Write-Ahead Logging (WAL)}
+
+In their seminal treatise on transaction processing, Gray and Reuter \cite{gray1993transaction} formalized the ACID (Atomicity, Consistency, Isolation, Durability) properties required for dependable relational computing. Central to this architecture is the \textbf{Write-Ahead Logging (WAL)} protocol: prior to applying any modification to a persistent database page on disk, a log record describing the modification must be written and flushed to durable, non-volatile storage.
+
+EffectGuard adopts Gray's WAL protocol to govern autonomous agent tool calls. Before the gateway dispatches a state-mutating action to the underlying SQLite database, it writes a journal row with status \texttt{PENDING}. If the subsequent mutation succeeds and is acknowledged, the journal transitions to \texttt{COMMITTED}. If a system crash or network timeout occurs during execution, the persistent journal provides an indisputable ground truth that enables deterministic recovery.
+
+\subsection{The Saga Pattern and Long-Lived Transactions}
+
+Garcia-Molina and Salem \cite{garciamolina1987sagas} introduced the Saga pattern to manage distributed transactions that span multiple independent databases or microservices without holding long-lived database locks. A Saga consists of a sequence of local transactions $(T_1, T_2, \dots, T_n)$, where each transaction $T_i$ is paired with a compensating transaction $C_i$ designed to undo the side effects of $T_i$ should a subsequent step $T_{i+k}$ fail.
+
+In the context of autonomous tool-calling agents, execution flows resemble long-lived Sagas: an agent reads customer history ($T_1$), calculates eligibility ($T_2$), issues a refund ticket ($T_3$), and sends an email receipt ($T_4$). If $T_3$ succeeds but the socket drops before $T_4$, standard agents lack the transactional semantics to know whether to compensate or retry. EffectGuard embeds Saga-like state tracking directly into its execution journal.
+
+\subsection{HTTP Semantics, Distributed Idempotency, and RFC 9110}
+
+The Internet Engineering Task Force (IETF) codified the mathematical concept of idempotency in RFC 9110 \cite{rfc9110} (and its predecessor RFC 7231 \cite{rfc7231}). Formally, an operation $f$ is idempotent if and only if executing it multiple times produces the identical side effect on the system state as executing it a single time:
+\begin{equation}
+    f(f(x)) = f(x) \quad \forall x
+\end{equation}
+In modern distributed API architecture (such as payment infrastructure designed by Stripe and Adyen), distributed idempotency is enforced through client-provided \textit{Idempotency Keys}. When a client dispatches an HTTP POST request, it attaches a unique identifier in the \texttt{Idempotency-Key} header. The receiving server records the key alongside the execution receipt. If the client retries the request due to a dropped socket, the server identifies the duplicate key, bypasses mutation, and returns the cached receipt.
+
+While enterprise web services enforce idempotency keys for human developers, contemporary LLM agent frameworks (such as LangChain, LangGraph, AutoGPT, and CrewAI) provide no native mechanisms to generate, manage, or verify idempotency keys at the tool boundary. Because LLMs alter whitespace, punctuation, and phrasing across turns, naive hashing of raw prompts fails. EffectGuard resolves this by implementing a canonicalized SHA-256 idempotency engine that derives deterministic keys across retry attempts.
+
+\subsection{The Two Generals Problem and Tail Latency Under Chaos}
+
+In distributed systems theory, the \textbf{Two Generals Problem} proves that achieving guaranteed consensus across an unreliable communication channel with unconstrained transmission delays is mathematically undecidable \cite{tanenbaum2007distributed}. Werner Vogels \cite{vogels2009eventually} and Jeff Dean \cite{dean2013tailatscale} demonstrated that in modern cloud architectures, transient network drops, socket timeouts, and tail latency spikes are not rare anomalies; they are permanent operational characteristics of distributed computing.
+
+When an autonomous agent operates across distributed networks, a socket drop after commit leaves the agent in an ambiguous state: it cannot distinguish whether the server never received the request, or whether the server committed the transaction and only the return receipt was lost. Naive agents assume failure and retry; EffectGuard implements \textbf{Verify-Before-Retry}, querying the persistent ledger before issuing any retry command.
+
+\section{Agent Evaluation Benchmarks and Their Limitations}
+
+To contextualize EffectGuard's evaluation framework, we analyze the current state of academic agent evaluation benchmarks.
+
+\subsection{Conversational and Prompt-Level Benchmarks}
+
+Early evaluation benchmarks, including MT-Bench \cite{zheng2023judging} and AlpacaEval \cite{li2023alpacaeval}, evaluate foundation models on open-ended conversational tasks using an LLM-as-a-judge paradigm. While valuable for ranking linguistic capability, these benchmarks are fundamentally incapable of evaluating agents that manipulate persistent environments. They evaluate the \textit{appearance} of task completion rather than the \textit{physical reality} of system state.
+
+\subsection{Environment-State Benchmarks: Tau-Bench and WebArena}
+
+A significant paradigm shift occurred with the introduction of $\tau$-bench by Yao et al.\ (Sierra AI) \cite{yao2024taubench}. $\tau$-bench recognized that evaluating conversational text is insufficient for enterprise customer service agents. Instead, $\tau$-bench evaluates agents in retail and airline domains by comparing the persistent database state at the conclusion of an episode ($\mathcal{S}_{\text{final}}$) against a target state ($\mathcal{S}_{\text{target}}$). Furthermore, $\tau$-bench introduced the $\text{pass}^k$ metric, demonstrating that agent reliability drops precipitously when tested across multiple independent runs.
+
+Similarly, Zhou et al.\ \cite{zhou2023webarena} introduced WebArena, a realistic web environment spanning e-commerce, content management, and code repository applications. Liu et al.\ \cite{liu2023agentbench} created AgentBench, evaluating agents across operating systems, databases, and digital card games.
+
+While $\tau$-bench, WebArena, and AgentBench represent the gold standard in state-level agent evaluation, they exhibit two critical limitations that EffectGuard addresses:
+\begin{enumerate}
+    \item \textbf{Clean-Room Operational Assumptions (0\% Chaos):} Existing benchmarks evaluate agents under idealized, zero-fault network conditions. They never inject dropped packets, post-commit 504 timeouts, or transient socket resets. Consequently, they fail to reveal how agents behave under real-world cloud unreliability.
+    \item \textbf{Passive Observation vs.\ Active Mitigation:} Existing benchmarks operate purely as offline evaluation harnesses; they observe and score agent failures, but provide no runtime architectural gateway to intercept, prevent, or recover from those failures in flight.
+    \item \textbf{Text-vs-Ledger Disconnect Unmeasured:} Existing benchmarks score final state, but do not systematically quantify linguistic hallucinations (False Claims) or uncommunicated mutations (Ghost Mutations).
+\end{enumerate}
+
+\section{Systematic Comparison of Key Prior Work}
+
+Table~\ref{tab:comparison} provides a comprehensive systematic comparison of EffectGuard against prominent prior frameworks across six architectural dimensions.
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{|p{3.2cm}|p{2.2cm}|p{2.4cm}|p{2.2cm}|p{1.8cm}|p{2.6cm}|}
+\hline
+\rowcolor{gray!15}
+\textbf{Framework} & \textbf{Primary Target} & \textbf{Execution Gate} & \textbf{Idempotency} & \textbf{Chaos Test} & \textbf{Primary Metric} \\
+\hline
+\textbf{EffectGuard (Ours)} & \textbf{State Invariants} & \textbf{Policy-as-Code} & \textbf{SHA-256 + WAL} & \textbf{Yes (20\%, 35\%)} & \textbf{Claim-Ledger Diff} \\
+\hline
+ReAct \cite{yao2022react} & Reasoning & None & None & None & Task Success \\
+\hline
+Toolformer \cite{schick2023toolformer} & API Selection & None & None & None & Token Perplexity \\
+\hline
+NeMo Guardrails \cite{rebedea2023nemo} & Prompt Safety & Colang Flow & None & None & Rail Compliance \\
+\hline
+Llama Guard \cite{inan2023llama} & Content Safety & Prompt Filter & None & None & Moderation Flag \\
+\hline
+$\tau$-bench \cite{yao2024taubench} & Database State & None (Passive) & None & None & State $\text{pass}^k$ \\
+\hline
+WebArena \cite{zhou2023webarena} & Web Sandboxes & None (Passive) & None & None & Task Completion \\
+\hline
+Gorilla \cite{patil2023gorilla} & API Syntax & None & None & None & AST Accuracy \\
+\hline
+\end{tabular}
+\caption{Systematic comparison of EffectGuard with key prior paradigms in agent reasoning, safety guardrails, and environment evaluation.}
+\label{tab:comparison}
+\end{table}
+
+\section{Identified Research Gaps}
+
+Based on this comprehensive literature review, five distinct, unaddressed research gaps emerge:
+
+\begin{enumerate}
+    \item \textbf{Gap 1: Absence of Chaos-Tested Network Evaluation for Tool-Calling Agents:}
+    While chaos engineering is standard practice in distributed microservices \cite{basu2024chaos}, no existing agent benchmark systematically evaluates autonomous tool-calling LLMs under active network turbulence (simulated packet drops, dropped TCP sockets, and HTTP 504 timeouts). The vulnerability of agent retry loops under distributed failure remains unquantified.
+
+    \item \textbf{Gap 2: The Post-Commit Distributed Timeout Dilemma in Agent Runtimes:}
+    Existing agent frameworks delegate error recovery entirely to the language model. When a mutating tool times out post-commit, foundation models possess no transactional mechanisms to inspect persistent transaction logs, leading directly to catastrophic duplicate mutations and financial loss.
+
+    \item \textbf{Gap 3: Fragility of Prompt-Space Policy Enforcement:}
+    Current industry architectures embed business rules (such as 30-day return windows and financial payout limits) directly into system prompts. This exposes enterprises to prompt injection, instruction drift, and semantic boundary evasion. A deterministic runtime gateway enforcing Policy-as-Code outside prompt context is completely missing.
+
+    \item \textbf{Gap 4: Lack of Ground-Truth Independent Text-to-Ledger Verification:}
+    Existing benchmarks evaluate generated natural language or persistent database state in complete isolation. No published framework mathematically diffs the agent's textual assertions against persistent relational rows to detect False Claims, Ghost Mutations, and Amount Drift without requiring manual ground-truth labels.
+
+    \item \textbf{Gap 5: Empirical Architectural Ablation of Recovery Mechanisms:}
+    No prior study has empirically isolated the relative performance contributions of naive retries, exponential backoff, idempotency keys, and verify-before-retry protocols in autonomous agent execution under active chaos.
+\end{enumerate}
+
+\section{Chapter Summary}
+
+This literature survey establishes that while foundation models have developed impressive cognitive and syntactic tool-calling capabilities, the systems architecture supporting their execution remains dangerously primitive. Contemporary agents operate without transactional boundaries, without write-ahead logging, and without idempotency guarantees. 
+
+EffectGuard directly resolves these identified research gaps by coupling distributed systems principles (SHA-256 idempotency, write-ahead journaling, Verify-Before-Retry recovery) with deterministic Policy-as-Code gating and a formal Claim-vs-Ledger Auditor. In the following chapters, we detail the requirement engineering, system architecture, engineering implementation, and empirical verification of this framework.

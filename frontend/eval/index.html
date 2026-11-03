@@ -16,8 +16,8 @@
       <div class="brand-logo-mark">
         <div class="brand-logo-mark-inner"></div>
       </div>
-      <div class="brand-title">AgentSentinel</div>
-      <div class="brand-subtitle">Evaluation & Benchmark Dashboard</div>
+      <div class="brand-title">AgentSentinel + EffectGuard</div>
+      <div class="brand-subtitle">State-Level Execution Safety & Chaos Reliability Dashboard</div>
     </div>
 
     <!-- Header Actions -->
@@ -45,16 +45,33 @@
           <div class="control-item">
             <span class="control-label">Target Model:</span>
             <select id="evalModelSelect" class="control-select">
-              <option value="llama" selected>OpenAI OSS (20B)</option>
+              <option value="openai" selected>OpenAI OSS (20B)</option>
             </select>
           </div>
 
           <div class="control-item">
-            <span class="control-label">Dataset Scope:</span>
+            <span class="control-label">Safety Gateway:</span>
+            <select id="evalConditionSelect" class="control-select">
+              <option value="c4" selected>C4: EffectGuard (Safe)</option>
+              <option value="c0">C0: Naive Baseline (Unsafe)</option>
+            </select>
+          </div>
+
+          <div class="control-item">
+            <span class="control-label">Chaos Injection:</span>
+            <select id="evalFaultRateSelect" class="control-select">
+              <option value="0.0" selected>0% (Clean Network)</option>
+              <option value="0.20">20% (Chaos 504 Timeouts)</option>
+              <option value="0.35">35% (Severe Network Drops)</option>
+            </select>
+          </div>
+
+          <div class="control-item">
+            <span class="control-label">Scope:</span>
             <select id="evalCountSelect" class="control-select">
-              <option value="3">Quick Sample (3 Cases)</option>
-              <option value="5">Standard Sample (5 Cases)</option>
-              <option value="25" selected>Complete Benchmark (All 25 Golden Cases)</option>
+              <option value="3">Sample (3 Cases)</option>
+              <option value="5">Standard (5 Cases)</option>
+              <option value="25" selected>All 25 Golden Cases</option>
             </select>
           </div>
         </div>
@@ -67,11 +84,11 @@
 
       <!-- Model Status Card: OpenAI OSS (20B) -->
       <div class="model-status-grid" style="grid-template-columns: 1fr;">
-        <div id="modelCard_llama" class="model-card">
+        <div id="modelCard_openai" class="model-card">
           <div class="model-card-header">
             <div>
-              <div class="model-brand-title">OpenAI OSS (20B)</div>
-              <div class="model-brand-id">openai/gpt-oss-20b · Groq Fast Inference Engine</div>
+              <div class="model-brand-title">OpenAI OSS (20B) · Groq Fast Inference</div>
+              <div class="model-brand-id">LangGraph ReAct Agent · Ground Truth SQLite Ledger</div>
             </div>
             <span class="status-badge idle">IDLE</span>
           </div>
@@ -105,11 +122,11 @@
           Click "Start Live Evaluation" above to run live benchmarks across models.
         </div>
 
-        <div class="metrics-gauges-grid">
+        <div class="metrics-gauges-grid" style="grid-template-columns: repeat(6, 1fr);">
           
           <div class="metric-gauge-card">
             <div class="metric-gauge-header">
-              <span class="metric-gauge-title">Tool Correctness</span>
+              <span class="metric-gauge-title">Tool Sequence</span>
               <span id="mToolStatus" class="metric-badge-status">WAITING</span>
             </div>
             <div id="mToolScore" class="metric-score-value">-</div>
@@ -117,7 +134,7 @@
 
           <div class="metric-gauge-card">
             <div class="metric-gauge-header">
-              <span class="metric-gauge-title">Answer Correctness</span>
+              <span class="metric-gauge-title">Answer Polarity</span>
               <span id="mAnswerStatus" class="metric-badge-status">WAITING</span>
             </div>
             <div id="mAnswerScore" class="metric-score-value">-</div>
@@ -125,10 +142,26 @@
 
           <div class="metric-gauge-card">
             <div class="metric-gauge-header">
-              <span class="metric-gauge-title">Argument Correctness</span>
+              <span class="metric-gauge-title">Arguments</span>
               <span id="mArgStatus" class="metric-badge-status">WAITING</span>
             </div>
             <div id="mArgScore" class="metric-score-value">-</div>
+          </div>
+
+          <div class="metric-gauge-card">
+            <div class="metric-gauge-header">
+              <span class="metric-gauge-title">Financial Safety</span>
+              <span id="mFinStatus" class="metric-badge-status">WAITING</span>
+            </div>
+            <div id="mFinScore" class="metric-score-value">-</div>
+          </div>
+
+          <div class="metric-gauge-card">
+            <div class="metric-gauge-header">
+              <span class="metric-gauge-title">Claim Audit</span>
+              <span id="mClaimStatus" class="metric-badge-status">WAITING</span>
+            </div>
+            <div id="mClaimScore" class="metric-score-value">-</div>
           </div>
 
           <div class="metric-gauge-card">
@@ -147,7 +180,7 @@
         <div class="section-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
           <div>
             <span class="section-title">Live Test-Case Results Stream</span>
-            <span style="font-size: 11px; color: var(--ink-muted); margin-left: 8px;">DeepEval Execution Telemetry</span>
+            <span style="font-size: 11px; color: var(--ink-muted); margin-left: 8px;">State-Level Execution Telemetry</span>
           </div>
           <button type="button" id="downloadCsvBtn" class="btn-download" disabled title="Download completed test results as CSV spreadsheet">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -1px; margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -159,32 +192,32 @@
             <thead>
               <tr>
                 <th style="width: 45px;">#</th>
-                <th style="width: 80px;">Model</th>
+                <th style="width: 80px;">Category</th>
                 <th style="min-width: 170px;">Input Query</th>
-                <th style="min-width: 190px;">Given Output (Model)</th>
+                <th style="min-width: 190px;">Actual Output (Agent)</th>
                 <th style="min-width: 190px;">Expected Output</th>
                 <th style="min-width: 150px;">Tools Called</th>
-                <th style="width: 80px;" title="Tool Correctness Metric">Tool Cor.</th>
-                <th style="width: 80px;" title="Answer Correctness Metric">Ans Cor.</th>
-                <th style="width: 80px;" title="Argument Correctness Metric">Arg Cor.</th>
-                <th style="width: 80px;" title="Task Completion Metric">Task Comp.</th>
-                <th style="width: 75px;">Status</th>
-                <th style="width: 70px;">Latency</th>
+                <th style="width: 75px;" title="Tool Sequence Metric">Tool Seq</th>
+                <th style="width: 75px;" title="Answer Alignment">Ans Pol.</th>
+                <th style="width: 75px;" title="Argument Precision">Arg Match</th>
+                <th style="width: 85px;" title="Claim vs Database State">Claim Audit</th>
+                <th style="width: 70px;">Status</th>
+                <th style="width: 65px;">Latency</th>
                 <th style="width: 65px;">Inspect</th>
               </tr>
             </thead>
             <tbody id="resultsTableBody">
-              <!-- Populated dynamically via eval.js with all matrices -->
+              <!-- Populated dynamically via eval.js -->
             </tbody>
           </table>
         </div>
       </div>
 
-      <!-- Comparative Multi-Model Leaderboard -->
-      <div id="leaderboardSection" class="leaderboard-section" style="display: none;">
+      <!-- Multi-Model Leaderboard -->
+      <div id="leaderboardSection" class="leaderboard-section" style="display: none; margin-top: 24px;">
         <div class="section-header-bar">
-          <span class="section-title">Multi-Model Comparative Leaderboard</span>
-          <span style="font-size: 11px; color: var(--ink-muted);">Final Benchmark Summary</span>
+          <span class="section-title">Benchmark Summary Leaderboard</span>
+          <span style="font-size: 11px; color: var(--ink-muted);">Final Telemetry Report</span>
         </div>
         <table class="leaderboard-table">
           <thead>
@@ -247,7 +280,7 @@
         </div>
 
         <div class="modal-section-box">
-          <span class="modal-field-title">DeepEval Metrics Breakdown & Reasoning</span>
+          <span class="modal-field-title">State & Claim-Audit Telemetry</span>
           <div id="modalMetricsJson" class="modal-field-content code"></div>
         </div>
 

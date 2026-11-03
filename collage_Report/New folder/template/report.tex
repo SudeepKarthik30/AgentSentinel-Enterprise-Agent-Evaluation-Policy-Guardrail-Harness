@@ -1,0 +1,226 @@
+\documentclass[a4paper, 11pt, oneside]{report} 
+
+\newcommand{\plogo}{\fbox{$\mathcal{PL}$}} 
+\usepackage{graphicx}
+\usepackage{graphics}
+\usepackage{float}
+\usepackage[table,xcdraw]{xcolor}
+\usepackage[utf8]{inputenc} 
+\usepackage[T1]{fontenc} 
+\usepackage{fouriernc} 
+\usepackage{subcaption}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{longtable}
+\usepackage[nottoc]{tocbibind}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{listings}
+
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds, decorations.pathreplacing}
+\pgfplotsset{compat=1.18}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    filecolor=black,      
+    urlcolor=blue!70!black,
+    citecolor=blue!70!black,
+    pdftitle={EffectGuard: A State-Level Execution Safety Gateway and Chaos-Tested Reliability Harness for Autonomous Tool-Calling Agents},
+    pdfauthor={Thirumalasetty Karthik},
+    pdfsubject={B.Tech Capstone Project Report - CS3201},
+    pdfkeywords={LLM Agents, Execution Safety, Idempotency, Policy-as-Code, Distributed Systems, Evaluation Harness}
+}
+
+% Code listing configuration
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    keywordstyle=\color{blue!80!black}\bfseries,
+    commentstyle=\color{green!60!black}\itshape,
+    stringstyle=\color{red!70!black},
+    backgroundcolor=\color{gray!5},
+    showstringspaces=false,
+    tabsize=2
+}
+
+\begin{document} 	
+
+    \pagenumbering{roman}
+
+	\begin{titlepage} 
+		\centering 
+		\vspace*{\baselineskip} 
+		\vspace{0.75\baselineskip}
+		
+		{\LARGE \textbf{EffectGuard: A State-Level Execution Safety Gateway and Chaos-Tested Reliability Harness for Autonomous Tool-Calling Agents}\par}
+		
+		\vspace{1.5\baselineskip}
+		
+		{\large A report submitted for the course named}\\[0.3cm]
+		{\large \textbf{Project - I (CS3201)}}\\[0.3cm]
+		{\large in partial fulfillment for the award of the degree of}\\[0.3cm]
+		{\Large \textbf{Bachelor of Technology}}\\[0.2cm]
+		{\large in}\\[0.2cm]
+		{\large \textbf{Computer Science and Engineering}}\par
+		
+		\vspace{2.5\baselineskip}
+		
+		{\large Submitted By}\\[0.3cm]
+		{\scshape\Large Thirumalasetty Karthik \\ \large SEMESTER - VII \\ \large Roll No: 220101074}\par
+		
+		\vspace{2\baselineskip}
+		
+		{\large Supervised By}\\[0.3cm]
+		{\scshape\Large Dr. [Supervisor Name] \\ \large Assistant Professor \\ \large Department of Computer Science and Engineering}\par
+		
+		\vfill
+		
+		\begin{center}
+			\includegraphics[width=4.5cm]{report_file/iiit manipur.png}
+		\end{center}
+	
+	    {\scshape\small Department of Computer Science and Engineering\\ Indian Institute of Information Technology Senapati, Manipur \\ November, 2026\par}
+	
+    \end{titlepage}
+
+    %----------------------------------------------------------------------------------------
+    % DECLARATION
+    %----------------------------------------------------------------------------------------
+    \newpage
+    \begin{center}
+       { \LARGE \textbf{Declaration}}
+    \end{center}
+    \vspace{1cm}
+    In this submission, I have expressed my idea in my own words, and I have adequately cited and referenced any ideas or words that were taken from another source. I also declare that I adhere to all principles of academic honesty and integrity and that I have not misrepresented or falsified any ideas, data, facts, or sources in this submission. If any violation of the above is made, I understand that the institute may take disciplinary action. Such a violation may also engender disciplinary action from the sources which were not properly cited or permission not taken when needed.
+
+    \vspace{2.5cm}
+    \begin{flushright}
+        \textbf{Thirumalasetty Karthik} \\
+        Roll Number: 220101074 \\
+        B.Tech (Computer Science and Engineering) \\
+        IIIT Senapati, Manipur \\[0.5cm]
+        DATE: 02-11-2026
+    \end{flushright}
+
+    %----------------------------------------------------------------------------------------
+    % CERTIFICATE
+    %----------------------------------------------------------------------------------------
+    \newpage
+    \begin{center}
+    	\thispagestyle{empty}
+    		
+    		\begin{table}[h]
+    			\centering
+    			\includegraphics[scale=0.2]{report_file/iiit manipur.png}
+    			\begin{tabular}{l}
+    				\textbf{Department of Computer Science and Engineering} \\
+    				\textbf{Indian Institute of Information Technology Senapati, Manipur} \\
+    				Mantripukhri, Imphal, Manipur -- 795002, India \\
+    			\end{tabular}
+    		\end{table}
+    		\par\noindent\rule{\textwidth}{0.4pt}
+    			\vspace{0.2cm}
+    			\textbf{Dr. [Supervisor Name]} \hspace*{\fill} Email: \href{mailto:supervisor@iiitmanipur.ac.in}{supervisor@iiitmanipur.ac.in}\\
+    			Assistant Professor, Dept. of CSE \hspace*{\fill} Contact No: +91 xxxxxxxxxx\\[1.5cm]
+    			{\Huge \textbf{\emph{To Whom It May Concern}}}\\[1.2cm]
+    			\linespread{1.2}
+    			\large{This is to certify that the project report 
+                    entitled \textbf{``EffectGuard: A State-Level Execution Safety Gateway and Chaos-Tested Reliability Harness for Autonomous Tool-Calling Agents'',} submitted to the Department of Computer Science and Engineering, Indian Institute of Information Technology Senapati, Manipur in partial fulfillment for the award of degree of Bachelor of Technology in Computer Science and Engineering is a record of bonafide work carried out by \textbf{Thirumalasetty Karthik} bearing roll number \textbf{220101074}.}\\[1.5cm]
+    			\hspace*{2.6in}\large{Signature of Supervisor}\\[0.3cm]
+    			\hspace*{2.5in}\textbf{(Dr. [Supervisor Name])}\\[0.8cm]
+    			
+    	\end{center}
+        \vspace{0.5cm}
+    	Signature of Examiner 1: .................................................... \\[0.4cm]
+    	Signature of Examiner 2: .................................................... \\[0.4cm]
+    	Signature of Examiner 3: .................................................... \\[0.4cm]
+    	Signature of Examiner 4: .................................................... \\[0.4cm]
+    	\newpage
+     
+
+    %----------------------------------------------------------------------------------------
+    % ABSTRACT
+    %----------------------------------------------------------------------------------------
+    \begin{abstract}
+    Autonomous Large Language Model (LLM) agents equipped with tool-calling capabilities are increasingly deployed to execute operational actions in enterprise environments, including payment processing, customer refunds, order cancellations, and infrastructure management. However, conventional evaluation and safety methodologies evaluate agents almost exclusively by grading their generated conversational text. This creates a critical reliability gap: an agent may articulate that an action succeeded while invoking no tools, mutate database records without informing the user, or trigger catastrophic duplicate side-effects during transient distributed network failures. When a mutating tool call experiences a commit-timeout failure (e.g., HTTP 504 Gateway Timeout occurring after database mutation), naive ReAct agents retry blindly, resulting in severe financial loss and data corruption.
+
+    This thesis presents \textbf{EffectGuard}, a state-level execution safety gateway, and \textbf{AgentSentinel}, a chaos-tested reliability evaluation harness designed to enforce transactional safety and empirical verifiability for autonomous agents. EffectGuard intercepts state-mutating tool executions at the runtime boundary, decoupling enterprise business policies from fragile prompt contexts into deterministic \textbf{Policy-as-Code (PAC)} invariants. To eliminate duplicate mutations under distributed failure, EffectGuard introduces a deterministic \textbf{SHA-256 Idempotency Key Engine}, write-ahead logging (WAL), and an automated \textbf{Verify-Before-Retry} recovery protocol. To detect discrepancies between generated text and persistent records, EffectGuard formulates a formal \textbf{Claim-vs-Ledger Auditor} that categorizes and detects False Claims (linguistic hallucinations), Ghost Mutations (silent side-effects), and Amount Drift.
+
+    We evaluate our framework across a hermetic 25-scenario evaluation dataset spanning five enterprise operational categories under controlled chaos fault injection (simulating 20\% and 35\% network drops and post-commit timeouts). Empirical ablation across five architectural conditions (C0 Naive Baseline, C1 Exponential Backoff, C2 Idempotency Keys Only, C3 Verify-Before-Retry Only, and C4 Full EffectGuard) demonstrates that while naive agents suffer duplicate payouts (\$125.00+ USD financial loss) and severe API rate-limit exhaustion (average latency of 47.1 seconds), EffectGuard completely eliminates duplicate executions, achieving \textbf{0.0\% financial hallucination, \$0.00 excess payout loss}, a \textbf{75.7\% reduction in end-to-end latency (11.5 seconds)}, and \textbf{100.0\% valid refund fulfillment} under aggressive network chaos.
+    \end{abstract}
+
+    \pagebreak
+    	
+    %----------------------------------------------------------------------------------------
+    % ACKNOWLEDGEMENT
+    %----------------------------------------------------------------------------------------
+    \begin{center}
+        { \LARGE \textbf{Acknowledgement}}
+    \end{center}
+	\vspace{1cm}
+	I would like to express my deepest gratitude to my project supervisor, \textbf{Dr. [Supervisor Name]}, Assistant Professor in the Department of Computer Science and Engineering, Indian Institute of Information Technology Senapati, Manipur, for his invaluable guidance, continuous encouragement, and constructive critique throughout the course of this capstone research work. His insightful feedback and rigorous academic standards were instrumental in shaping the theoretical formulation and experimental methodology of this project.
+
+    I am profoundly grateful to the faculty members and staff of the Department of Computer Science and Engineering, IIIT Senapati, Manipur, for providing the necessary academic infrastructure, computational resources, and supportive environment required to conduct this work.
+
+    I also extend my sincere appreciation to the authors, open-source maintainers, and researchers in the broader artificial intelligence and distributed systems communities whose foundational work on autonomous agents, language models, and transactional reliability formed the cornerstone of this investigation.
+
+    Finally, I owe my deepest gratitude to my family and peers for their unwavering patience, moral support, and constant motivation during the development, testing, and completion of this project report.
+	
+	\vspace{1.5cm}
+	\begin{flushright}
+	    \textbf{Thirumalasetty Karthik} \\
+	    Roll No: 220101074 \\
+	    Department of Computer Science and Engineering \\
+	    Indian Institute of Information Technology Senapati, Manipur
+	\end{flushright}
+
+	\newpage
+	
+    %----------------------------------------------------------------------------------------
+    % TABLE OF CONTENTS & LISTS
+    %----------------------------------------------------------------------------------------
+	\tableofcontents
+    \newpage
+	\listoffigures
+    \newpage
+    \listoftables
+    \newpage
+
+    % Begin Arabic Page Numbering for Chapters (College Format: Strictly 40+ pages)
+    \pagenumbering{arabic}
+    \setcounter{page}{1}
+
+	\chapter{Introduction}
+	\input{chapters/1_Introduction}
+    
+    \chapter{Literature Survey}
+    \input{chapters/2_Literature_Survey}
+    
+    \chapter{Requirement Engineering}
+    \input{chapters/3_Requirement}
+    
+    \chapter{System Design and Architecture}
+    \input{chapters/4_System_Design}
+    
+    \chapter{System Implementation}
+    \input{chapters/5_Implementation}
+    
+    \chapter{Experimental Results and Discussion}
+    \input{chapters/6_Results}
+    
+    \chapter{Conclusion and Future Work}
+    \input{chapters/7_Conclusion}
+    
+    \newpage
+    \bibliography{report}
+	\bibliographystyle{plain}
+        
+\end{document}

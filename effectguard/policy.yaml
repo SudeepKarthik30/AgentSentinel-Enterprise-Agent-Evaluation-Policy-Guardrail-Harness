@@ -1,0 +1,36 @@
+# =============================================================================
+# EffectGuard Safety Policy Configuration
+# =============================================================================
+# Declarative Policy-as-Code (PAC) rules for LLM agent tools.
+# Separates policy validation from fragile system prompts into deterministic code.
+
+tools:
+  get_user_purchase_history:
+    effect_class: "read_only"
+    description: "Query customer purchase history from SQLite"
+    preconditions: []
+
+  get_today_date:
+    effect_class: "read_only"
+    description: "Retrieve frozen benchmark date and 30-day cutoff date"
+    preconditions: []
+
+  calculate_right_refund:
+    effect_class: "read_only"
+    description: "Calculate total monetary value of eligible items"
+    preconditions:
+      - "user_exists"
+
+  issue_refund_ticket:
+    effect_class: "irreversible"
+    description: "State-mutating tool that writes financial tickets to database"
+    preconditions:
+      - "user_exists"
+      - "positive_amount"
+      - "within_safety_ceiling"
+      - "has_unrefunded_purchases"
+    max_amount_ceiling: 500
+    retry_policy:
+      max_retries: 2
+      verify_before_retry: true
+      require_idempotency: true

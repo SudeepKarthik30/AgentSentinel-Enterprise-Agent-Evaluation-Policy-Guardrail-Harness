@@ -72,6 +72,15 @@ async def handle_reset(req: ResetRequest):
     return {"status": "reset", "session_id": req.session_id, "thread_id": new_thread}
 
 
+@app.post("/api/chat/reseed")
+async def handle_reseed():
+    """Optionally reseed database to fresh factory baseline (admin/demo utility)."""
+    from db import init_db, clear_refund_tickets
+    init_db(force_reseed=True)
+    clear_refund_tickets()
+    return {"status": "reseeded"}
+
+
 # Serve Chat Frontend
 frontend_dir = workspace_dir / "frontend"
 app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="static")

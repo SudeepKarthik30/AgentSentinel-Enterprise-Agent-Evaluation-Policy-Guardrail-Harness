@@ -22,7 +22,7 @@ function initChat() {
       const message = input.value.trim();
       if (!message) return;
 
-      const selectedModel = modelSelect ? modelSelect.value : "llama";
+      const selectedModel = modelSelect ? modelSelect.value : "openai";
 
       appendMessage("user", message);
       input.value = "";

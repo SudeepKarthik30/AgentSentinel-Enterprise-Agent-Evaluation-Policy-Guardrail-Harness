@@ -1,0 +1,60 @@
+%% Chapter 7 — Conclusion
+%% Data-verified and humanized.
+%% Confirmed figures: CRIR 0.90→0.50, reduction 44.4%, 100 queries, 27 adversarial docs.
+
+\section{Summary of Findings}
+
+This project built \textbf{MediCare Secure RAG}, a defence-in-depth framework for securing RAG pipelines in healthcare against three classes of inference-time attack: Knowledge Poisoning, Indirect Prompt Injection, and Cross-Tenant Data Leakage. The system was evaluated across 100 queries in three independently controlled experimental conditions.
+
+The main findings are:
+\begin{enumerate}
+    \item The RAG Trust Paradox is practically exploitable. Without defence active, 90\% of queries returned at least one poisoned document in the top-5, and the LLM produced incorrect medical advice with no visible indication that anything was wrong.
+    \item The five-layer defence pipeline reduced the average CRIR score from 0.90 to \textbf{0.50} --- a \textbf{44.4\% reduction} --- and dropped the proportion of affected queries from 90\% to 50\%.
+    \item Layer 5 (Embedding Anomaly Detection) is the most effective layer against Knowledge Poisoning. It targets the coordinated multi-document retrieval pattern that PoisonedRAG-style attacks depend on.
+    \item Layer 2 (RBAC at Retrieval) is a compliance necessity more than a performance optimisation. Without it, any patient with a semantically similar query can retrieve restricted clinical records belonging to a different patient.
+    \item CRIR provides more information than binary ASR. The precision component (0.678 undefended, 0.808 defended) shows how much clean context survived, not just whether an attack succeeded.
+\end{enumerate}
+
+\section{Major Research Contributions}
+
+\begin{enumerate}
+    \item \textbf{Healthcare-domain RAG security evaluation:} An empirical evaluation over 100 benchmark queries using 52 clean NHS/WHO/CDC documents and 27 adversarial documents spanning all three attack classes, run under three independently controlled conditions.
+    \item \textbf{CRIR metric:} A retrieval-level security metric that goes beyond binary Attack Success Rate. CRIR is computable at inference time without ground-truth labels, which makes it practical for production deployment monitoring.
+    \item \textbf{Five-layer clinical defence pipeline:} A complete implementation covering ingestion sanitisation, access-controlled retrieval, prompt hardening, output monitoring, and embedding anomaly detection, validated on a realistic healthcare corpus.
+    \item \textbf{Live attack-defence demonstration:} A Streamlit application with a three-column real-time comparison of clean, poisoned, and defended states --- concrete enough to show to someone who has never read a security paper.
+\end{enumerate}
+
+\section{Future Enhancements}
+
+\subsection{9-Stage production pipeline}
+The current five-layer architecture would be extended to a nine-stage pipeline for clinical deployment. The two most important additions are hybrid retrieval (combining the existing dense vector search with BM25 sparse keyword matching to reduce the chance of poisoned documents dominating top-$k$ through embedding manipulation alone) and persistent audit logging tied to HIPAA Security Rule requirements.
+
+\subsection{Doctor knowledge contribution portal}
+A secure interface for verified medical professionals to contribute clinical guidelines via PDF upload. Each submission would be scanned in real time and receive a ``Safe Score'' before entering the knowledge base. The portal design, including doctor verification flow and document repository dashboard, is documented in the Future Enhancements scope.
+
+\subsection{Patient-facing search enhancements}
+The patient interface would gain attribution transparency --- showing which verified doctors contributed the source documents behind each answer --- and a ``Transparency Section'' allowing inspection of retrieved versus blocked documents per query.
+
+\subsection{Formal CRIR extension}
+The current binary CRIR would be extended to a continuous formulation combining retrieval rank shift and semantic deviation from ground-truth medical knowledge:
+\begin{equation}
+\text{CRIR} = \alpha \cdot (\Delta\text{MRR}) + \beta \cdot \mathcal{D}_{JS}\bigl(P(\hat{y}) \;\|\; P(y_{gt})\bigr)
+\end{equation}
+where $\mathcal{D}_{JS}$ is the Jensen-Shannon divergence between the generated answer distribution and the ground-truth distribution. This would make CRIR a continuous audit signal rather than a per-query flag.
+
+\subsection{Persistent storage and multi-tenant isolation}
+Replace the in-memory ChromaDB instance with a persistent store backed by Row-Level Security, so tenant isolation is enforced at the database engine rather than through application-level metadata filters. This closes the vector re-identification side-channel identified in the security analysis.
+
+\subsection{ML-based guard layer}
+Add a dedicated guardrail model (Llama Guard 3 or NeMo Guardrails) to Layer 4's output monitoring to catch semantic-level injection that evades regex matching. The 50\% residual CRIR score after defence shows there is still meaningful room to close.
+
+\subsection{HIPAA and SOC 2 Type II compliance}
+Extend toward HIPAA-ready infrastructure: AES-256 encryption at rest for stored embeddings and document text, identity-based authentication tied to EHR permissions at the retrieval layer, and automated compliance reporting against NICE Evidence Standards Framework requirements.
+
+\section{Final Reflection}
+
+The result that sticks with me is the simple one: 90\% attack rate without defence, 50\% with it. That is not a complete solution. But it is a measurable, reproducible improvement achieved by a pipeline that runs in under four seconds per query on a standard laptop.
+
+The harder finding is that the remaining 50\% contamination rate shows how difficult it is to defeat semantically crafted adversarial documents without a ground-truth medical knowledge baseline to compare against. The gap between what the defence catches and what gets through is not a bug in the implementation --- it reflects a genuine open problem in retrieval security.
+
+The most useful thing this project produced is probably not any individual defence layer, but the framing: retrieval integrity is a security objective in its own right, separate from both the model's safety training and application-level input filtering. As RAG becomes the standard way LLMs interact with high-stakes domain knowledge in medicine, law, and finance, measuring and defending retrieval integrity will matter as much as monitoring model outputs. MediCare is an early attempt to take that measurement seriously.

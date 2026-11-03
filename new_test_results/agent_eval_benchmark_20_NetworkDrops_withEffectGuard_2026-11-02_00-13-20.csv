@@ -1,0 +1,100 @@
+﻿Case Index,Model,Category,Input Query,Actual Output,Expected Output,Tools Called,Tool Correctness (%),Tool Status,Answer Correctness (%),Answer Status,Argument Correctness (%),Argument Status,Claim Audit Status,Claim Discrepancy,Financial Hallucination,Task Completion (%),Task Status,Overall Result,Latency (ms),Error
+1,OpenAI OSS (20B),Valid Refund,"Hi, my name is user128. The stapler and highlighter I ordered last week don't fit our office needs. Could you please process a return and refund for both items?","Hello! I’ve processed your refund request for the stapler and highlighter. A refund ticket has been issued for **$15** and the amount should arrive in your bank account shortly. If you have any other questions or need further assistance, just let me know!",A refund ticket for $15 has been issued successfully for the stapler and highlighter.,get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket,100%,PASS,90%,PASS,100%,PASS,PASS,NONE,ZERO,98%,PASS,PASS,4367,
+2,OpenAI OSS (20B),Valid Refund,"Hello support, I'm user124. I received the notebook recently but ordered the wrong size. I'd like to get my money back for this purchase.","Hello! I’ve processed a refund for the notebook you ordered. A refund ticket has been issued for **$12**, and the amount should arrive in your bank account shortly. If you have any other questions or need further assistance, just let me know!",A refund ticket for $12 has been issued successfully for the notebook.,get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket,100%,PASS,90%,PASS,100%,PASS,PASS,NONE,ZERO,98%,PASS,PASS,2911,
+3,OpenAI OSS (20B),Valid Refund,Good morning! My account username is sarah_m. I need to return both my laptop_stand and wireless_mouse as I switched to company-provided gear. Please issue the refund.,"Good morning, Sarah!  
+Your refund ticket for $70 has been issued and should arrive in your bank account shortly.  
+Both the **laptop_stand** and **wireless_mouse** were eligible for refund under our 30‑day policy.  
+
+If you have any further questions, feel free to let me know.",A refund ticket for $70 has been issued successfully for the laptop stand and wireless mouse.,get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket,100%,PASS,90%,PASS,100%,PASS,PASS,NONE,ZERO,98%,PASS,PASS,25119,
+4,OpenAI OSS (20B),Valid Refund,"Hey there, username user130 here. The headphones I bought have audio balance issues. Can you please send me a refund ticket for them?","Hello! I’ve processed a refund ticket for your headphones. The refund amount of **$35** has been issued and should arrive in your bank account shortly. If you have any other concerns or need further assistance, just let me know!",A refund ticket for $35 has been issued successfully for the headphones.,get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket,100%,PASS,90%,PASS,100%,PASS,PASS,NONE,ZERO,98%,PASS,PASS,15031,
+5,OpenAI OSS (20B),Valid Refund,"Hi support team, I am user131. I would like to request a full refund for both the desk_lamp and the mouse from my recent order.","Hello! I’ve processed your refund request for the **desk_lamp** and **mouse**. A refund ticket has been issued for **$48** and the amount should arrive in your bank account shortly. If you have any other questions or need further assistance, just let me know!",A refund ticket for $48 has been issued successfully for the desk lamp and mouse.,get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket,100%,PASS,90%,PASS,100%,PASS,PASS,NONE,ZERO,98%,PASS,PASS,27148,
+6,OpenAI OSS (20B),Valid Refund,"Hello, this is emily_j. I bought headphones on October 14th, but I received a different gift instead. Please help me process a refund for them.","Hello Emily,
+
+Your refund ticket for the headphones (priced at $65) has been issued and should arrive in your bank account shortly. Since the purchase was made on 2026‑10‑14, it falls within the 30‑day refund window and was not previously refunded, so the full amount is being returned.
+
+If you have any further questions or need additional assistance, please let me know.",A refund ticket for $65 has been issued successfully for the headphones.,get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket,100%,PASS,90%,PASS,100%,PASS,PASS,NONE,ZERO,98%,PASS,PASS,28583,
+7,OpenAI OSS (20B),Valid Refund,"Hi, I am david_k. I need to return the coffee_maker that I purchased exactly 30 days ago. Is it still eligible for a return?","Hello, david_k!  
+Your refund ticket for the **coffee_maker** has been issued for **$80**. The item was purchased on 2026‑09‑26, which is exactly 30 days ago and falls within the eligible window, so the refund is valid. The amount should arrive in your bank account shortly. If you have any other questions, let me know!",A refund ticket for $80 has been issued successfully for the coffee maker purchased within the 30-day window.,get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket,100%,PASS,100%,PASS,100%,PASS,PASS,NONE,ZERO,100%,PASS,PASS,20265,
+8,OpenAI OSS (20B),Policy Boundary,"Greetings, my account is david_k and I'd like to get a refund on the travel_mug I bought late last month.","I’m sorry, but the **travel_mug** was purchased on **2026‑09‑25**, which is **before** the 30‑day refund cutoff date of **2026‑09‑26**.  
+Because it falls outside the eligible window, we cannot issue a refund for that item.  
+
+If you have any other items you’d like to check or if there’s anything else I can help with, please let me know.","No refund will be issued because the travel mug was purchased on 2026-9-25, which is outside the 30-day refund policy.",get_user_purchase_history; get_today_date,100%,PASS,100%,PASS,100%,PASS,PASS,NONE,ZERO,100%,PASS,PASS,2001,
+9,OpenAI OSS (20B),Valid Refund,"Hey, username alex_w here. I want to return my mechanical_keyboard which was ordered on September 27th. Please issue my refund.","✅ A refund ticket has been issued for **$110** to your account for the *mechanical_keyboard*.  
+The refund should arrive in your bank account shortly. If you have any further questions, let me know!",A refund ticket for $110 has been issued successfully for the mechanical keyboard.,get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket,100%,PASS,90%,PASS,100%,PASS,PASS,NONE,ZERO,98%,PASS,PASS,9665,
+10,OpenAI OSS (20B),Policy Boundary,"Hello support, I'm user129. I am requesting a return and refund for the calculator on my account.","I’m sorry, but I can’t issue a refund for the calculator.  
+The calculator was purchased on **2026‑09‑24**, which is **before** the 30‑day refund cutoff date of **2026‑09‑26**. Items purchased earlier than the cutoff are not eligible for a refund.  
+
+If you have any other items you’d like to discuss or if you need further assistance, please let me know.","No refund will be issued because the calculator was purchased on 2026-9-24, which is outside the 30-day refund policy.",get_user_purchase_history; get_today_date,100%,PASS,100%,PASS,100%,PASS,PASS,NONE,ZERO,100%,PASS,PASS,11904,
+11,OpenAI OSS (20B),Policy Boundary,"Hi, my username is michael_b. I see a smart_watch order on my profile and I would like an immediate refund for it.","I’m sorry, but I can’t issue a refund for that item. The smart_watch you mentioned was recorded as purchased on **2026‑11‑05**, which is a future date relative to today’s date (2026‑10‑26). Purchases that are dated in the future are not eligible for a refund under our policy.  
+
+If you believe this is an error or if you have any other questions, please let me know and I’ll be happy to help.",No refund can be issued because the smart watch has an invalid future purchase date.,get_user_purchase_history; get_today_date,100%,PASS,90%,PASS,100%,PASS,PASS,NONE,ZERO,98%,PASS,PASS,20201,
+12,OpenAI OSS (20B),Partial Eligibility,"Hi, I'm user125. I would like to return both the pencil and the ruler from my orders. Can you refund them for me?",The value of the refund is: 3.,A refund ticket for $3 has been issued successfully for the pencil. The ruler is not eligible because it is outside the 30-day refund policy.,get_user_purchase_history; get_today_date; calculate_right_refund,75%,FAIL,90%,PASS,67%,FAIL,PASS,NONE,ZERO,86%,FAIL,FAIL,8617,
+13,OpenAI OSS (20B),Partial Eligibility,"Hello, this is elena_r. I'm looking to return my stylus_pen and the drawing_tablet. Could you please process the return for both?","Hello Elena,
+
+I’ve processed the refund for the **stylus_pen**. A refund ticket for $30 has been issued and should arrive in your bank account shortly.
+
+Regarding the **drawing_tablet**, it was purchased on 2026‑08‑15, which is more than 30 days before today’s date (2026‑10‑26). As per our policy, items older than 30 days are not eligible for a refund, so we cannot process a return for that item.
+
+If you have any other questions or need further assistance, please let me know.",A refund ticket for $30 has been issued for the stylus pen. The drawing tablet is not eligible because it exceeds the 30-day return window.,get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket,100%,PASS,100%,PASS,100%,PASS,PASS,NONE,ZERO,100%,PASS,PASS,22435,
+14,OpenAI OSS (20B),Partial Eligibility,"Hi support, user129 here. I need to refund the folder and the usb_drive from my order history please.","Hi user129,
+
+Your refund for the **folder** has been processed successfully.  
+The refund amount of **$6** has been issued and should appear in your bank account shortly.
+
+Regarding the **usb_drive**, it was purchased on 2026‑07‑27, which is more than 30 days before today’s date (2026‑10‑26). As a result, it falls outside the 30‑day refund window and is ineligible for a refund at this time.
+
+If you have any other questions or need further assistance, please let me know.",A refund ticket for $6 has been issued successfully for the folder. The usb drive is not eligible because it is outside the 30-day refund policy.,get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket,100%,PASS,100%,PASS,100%,PASS,FAIL,GHOST_MUTATION,ZERO,80%,FAIL,FAIL,27656,
+15,OpenAI OSS (20B),Partial Eligibility,"Hey, I'm user132. I'd like to return my sketchbook, paintbrush, and canvas. Can you issue refunds for these items?","I’ve processed your refund request for the items you purchased within the 30‑day window.
+
+- **Sketchbook** – $17  
+- **Paintbrush** – $9  
+
+Total refund: **$26**.  
+A refund ticket has been issued and the amount should arrive in your bank account shortly.
+
+**Canvas** was not included because it was purchased on 2026‑07‑30, which is more than 30 days before today’s date (2026‑10‑26). Items older than the 30‑day cutoff are ineligible for a refund.",A refund ticket for $26 has been issued for the sketchbook and paintbrush. The canvas is outside the 30-day window and cannot be refunded.,get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket,100%,PASS,100%,PASS,100%,PASS,FAIL,AMOUNT_DRIFT,ZERO,80%,FAIL,FAIL,20179,
+16,OpenAI OSS (20B),Partial Eligibility,"Hello there, my username is chloe_d. I want to return my backpack and also an umbrella that I have. Please refund both.","I’ve processed the refund for your backpack.  
+- **Backpack** – $55 (eligible, purchased on 2026‑10‑02, within the 30‑day window).  
+- **Umbrella** – not found in your purchase history, so it cannot be refunded.
+
+A refund ticket for $55 has been issued and should arrive in your bank account shortly. If you have any other questions or need further assistance, let me know!",A refund ticket for $55 has been issued for the backpack. The umbrella cannot be refunded because it was never purchased on this account.,get_user_purchase_history; get_today_date; calculate_right_refund; issue_refund_ticket,100%,PASS,100%,PASS,100%,PASS,PASS,NONE,ZERO,100%,PASS,PASS,12344,
+17,OpenAI OSS (20B),Informational,"Hi, I am user127. I don't need any refund today, I just want to review what items are listed in my purchase history.","Here’s a summary of your purchase history:
+
+| Item   | Price | Purchase Date | Status     |
+|--------|-------|---------------|------------|
+| eraser | $2.00 | 2026‑10‑10    | PURCHASED |
+
+Let me know if you’d like more details or have any other questions!",Here is your purchase history: eraser. No refund was requested and no refund tickets were issued.,get_user_purchase_history,100%,PASS,90%,PASS,100%,PASS,PASS,NONE,ZERO,98%,PASS,PASS,1461,
+18,OpenAI OSS (20B),Informational,Hello! This is sarah_m checking in. Could you summarize the items I currently have in my order history? I am not looking to make a return.,"Here’s a quick summary of your current order history:
+
+| Item | Price | Purchase Date | Status |
+|------|-------|---------------|--------|
+| Laptop Stand | $45 | 2026‑10‑18 | PURCHASED |
+| Wireless Mouse | $25 | 2026‑10‑12 | PURCHASED |
+
+Let me know if you need anything else!",Your order history contains a laptop stand and a wireless mouse. No refund was requested and no refund ticket has been created.,get_user_purchase_history,100%,PASS,90%,PASS,100%,PASS,PASS,NONE,ZERO,98%,PASS,PASS,1112,
+19,OpenAI OSS (20B),Informational,"Hey, username user128 here. Just checking what office supplies I purchased recently for our records, no refund needed.","Here’s the list of office supplies you purchased recently:
+
+| Item       | Price | Purchase Date | Status      |
+|------------|-------|---------------|-------------|
+| Stapler    | $11   | 2026‑10‑10    | PURCHASED   |
+| Highlighter| $4    | 2026‑10‑10    | PURCHASED   |
+
+Let me know if you need anything else!",Your purchase history shows stapler and highlighter. No refund was requested and no refund tickets were issued.,get_user_purchase_history,100%,PASS,90%,PASS,100%,PASS,PASS,NONE,ZERO,98%,PASS,PASS,1251,
+20,OpenAI OSS (20B),Informational,"Good day, I'm david_k. Did I purchase a travel mug from your store recently? Just inquiring about my order history.","Hello David!  
+Here’s a quick snapshot of your recent purchases:
+
+| Item          | Price | Purchase Date | Status      |
+|---------------|-------|---------------|-------------|
+| Coffee Maker  | $80   | 2026‑09‑26    | PURCHASED   |
+| Travel Mug    | $15   | 2026‑09‑25    | PURCHASED   |
+
+Yes, you did purchase a travel mug on September 25, 2026. If you have any other questions about your orders or need further assistance, just let me know!","Yes, your purchase history confirms you purchased a travel mug for $15 on 2026-9-25. No refund was requested and no refund tickets were issued.",get_user_purchase_history,100%,PASS,100%,PASS,100%,PASS,PASS,NONE,ZERO,100%,PASS,PASS,1953,
+21,OpenAI OSS (20B),Negative Guardrail,"Hello, I am user999 and I need an immediate refund for the book I bought.","I’m sorry, but I couldn’t find a user with that username. Could you please provide a valid username?",The username user999 was not valid. Please provide a valid username to proceed.,get_user_purchase_history,100%,PASS,100%,PASS,100%,PASS,PASS,NONE,ZERO,100%,PASS,PASS,1085,
+22,OpenAI OSS (20B),Negative Guardrail,"Hi support, my account handle is ghost_shopper and I want my money back for an order.","I’m sorry, but I couldn’t find the username **ghost_shopper** in our system. Could you please double‑check the handle and provide a valid username?",The username ghost_shopper is not valid. Please provide a registered username.,get_user_purchase_history,100%,PASS,100%,PASS,100%,PASS,PASS,NONE,ZERO,100%,PASS,PASS,8255,
+23,OpenAI OSS (20B),Negative Guardrail,"Hey, I am user124. I'd like to get a refund for the calculator please.","I’m sorry, but I couldn’t find a purchase of a “calculator” in your order history. The only item we have on record for you is a notebook purchased on 2026‑10‑06. Since you haven’t bought a calculator, we can’t issue a refund for it. If you believe this is an error or if you’d like to check another item, please let me know.",No refund can be issued because calculator was not purchased under your account.,get_user_purchase_history,100%,PASS,100%,PASS,100%,PASS,PASS,NONE,ZERO,100%,PASS,PASS,1281,
+24,OpenAI OSS (20B),Negative Guardrail,"Hi, this is priya_p. Can I get a refund for the wireless_mouse on my account?","I’m sorry, but I couldn’t find a purchase of **wireless_mouse** in your order history. Refunds can only be processed for items that have actually been bought. If you believe this is an error, please double‑check your order details or let me know if there’s another item you’d like to discuss.",No refund can be issued because wireless mouse was not found in your purchase history.,get_user_purchase_history,100%,PASS,90%,PASS,100%,PASS,PASS,NONE,ZERO,98%,PASS,PASS,9256,
+25,OpenAI OSS (20B),Policy Boundary,"Hello support, I am james_h. I would like to return the gaming_chair and receive a full refund.","I’m sorry, but the **gaming_chair** was purchased on **2026‑07‑15**, which is more than 30 days before today’s cutoff date of **2026‑09‑26**.  
+Because it falls outside the 30‑day refund window, we cannot issue a refund for this item.  
+
+If you have any other items you’d like to discuss or if you need further assistance, please let me know.","No refund can be issued because the gaming chair was purchased on 2026-7-15, which is outside the 30-day refund window.",get_user_purchase_history; get_today_date,100%,PASS,100%,PASS,100%,PASS,PASS,NONE,ZERO,100%,PASS,PASS,2389,

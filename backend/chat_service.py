@@ -14,6 +14,7 @@ load_dotenv(override=True)
 from tools import calculate_right_refund, get_today_date, issue_refund_ticket, get_user_purchase_history
 from prompts import agent_system_prompt
 from objects import Answer
+from effectguard.gateway import effectguard_gateway
 from langchain_openai import ChatOpenAI
 from langchain.chat_models import init_chat_model
 from langchain.agents import create_agent
@@ -34,12 +35,16 @@ class SimpleChatService:
         return session_id, self.active_sessions[session_id]
 
     def reset_thread(self, session_id: str) -> str:
-        self.active_sessions[session_id] = str(uuid4())
-        return self.active_sessions[session_id]
+        new_thread = str(uuid4())
+        self.active_sessions[session_id] = new_thread
+        effectguard_gateway.set_current_thread_id(new_thread)
+        return new_thread
 
-    def get_agent(self, model_key: str = "llama"):
-        """Instantiate agent for OpenAI OSS (20B) on Groq."""
+    def get_agent(self, model_key: str = "openai"):
+        """Instantiate agent for OpenAI OSS (20B) on Groq with optimized latency settings."""
         load_dotenv(override=True)
+        if "openai" in self.agent_cache:
+            return self.agent_cache["openai"]
         if "llama" in self.agent_cache:
             return self.agent_cache["llama"]
 
@@ -47,13 +52,16 @@ class SimpleChatService:
         if not groq_key:
             raise ValueError("GROQ_API_KEY is not set in .env")
 
+        # Optimized LLM configuration for sub-second tool execution on Groq
+        model_name = os.getenv("OPENAI_MODEL", os.getenv("LLAMA_MODEL", "openai/gpt-oss-20b"))
         llm = ChatOpenAI(
-            model=os.getenv("LLAMA_MODEL", "openai/gpt-oss-20b"),
+            model=model_name,
             api_key=groq_key,
             base_url="https://api.groq.com/openai/v1",
             temperature=0,
-            max_retries=5,
-            timeout=60.0,
+            max_tokens=600,      # Faster generation, prevents runaway token waffling
+            max_retries=2,       # Prevents multi-minute stalls on transient rate limits
+            timeout=30.0,
         )
 
         agent_instance = create_agent(
@@ -67,13 +75,17 @@ class SimpleChatService:
             ],
             checkpointer=self.checkpointer,
         )
+        self.agent_cache["openai"] = agent_instance
         self.agent_cache["llama"] = agent_instance
         return agent_instance
 
-    def send_message(self, session_id: str, message: str, model_key: str = "llama") -> Dict[str, Any]:
+    def send_message(self, session_id: str, message: str, model_key: str = "openai") -> Dict[str, Any]:
         """Invoke agent with user message and extract refund ticket if issued."""
         session_id, thread_id = self.get_thread(session_id)
         
+        # Propagate active thread context to EffectGuard gateway
+        effectguard_gateway.set_current_thread_id(thread_id)
+
         try:
             agent = self.get_agent(model_key)
             response = agent.invoke(

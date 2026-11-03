@@ -1,0 +1,210 @@
+\documentclass[a4paper, 11pt, oneside]{report} 
+
+\newcommand{\plogo}{\fbox{$\mathcal{PL}$}} 
+\usepackage{graphicx}
+\usepackage{graphics}
+\usepackage{float}
+\usepackage[table,xcdraw]{xcolor}
+\usepackage[utf8]{inputenc} 
+\usepackage[T1]{fontenc} 
+\usepackage{fouriernc} 
+\usepackage{subcaption}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{graphics}
+\usepackage{longtable}
+\usepackage[nottoc]{tocbibind}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{lipsum}
+\usepackage{colortbl}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric}
+\pgfplotsset{compat=1.18}
+\setlength{\arrayrulewidth}{0.5pt}
+\renewcommand{\arraystretch}{1.25}
+
+%% Currency macro: Rs. / INR without dollar symbols
+\newcommand{\INR}{\text{Rs.~}}
+
+%% Center all longtables globally if any
+\setlength{\LTleft}{\fill}
+\setlength{\LTright}{\fill}
+
+\begin{document} 	
+	\begin{titlepage} 
+		
+		\centering 
+		
+		\vspace*{\baselineskip} 
+		
+		\vspace{0.75\baselineskip}
+
+\begin{center}
+{\LARGE \textbf{EffectGuard: Agent Execution Safety Gateway}}
+
+\vspace{0.4em}
+
+{\normalsize\normalfont
+A State-Level Execution Safety Gateway and Chaos-Tested Reliability Harness\\[2pt]
+for Autonomous Tool-Calling Agents
+}
+\end{center}
+
+
+		\vspace{0.75\baselineskip}
+		
+		\vspace{2\baselineskip}
+
+		A report submitted for the course named Project - II (CS4202)
+		
+		\vspace*{7\baselineskip}
+		
+		Submitted By
+		
+		\vspace{0.5\baselineskip}
+		
+		{\scshape\Large THIRUMALASETTY KARTHIK \\ SEMESTER  VI \\ 230101007}
+		
+		\vspace{0.5\baselineskip}
+		
+		Supervised By
+		
+		\vspace{0.5\baselineskip}
+		
+		{\scshape\Large DR. NONGMEIKAPAM KISHORJIT SINGH}
+		
+		\vspace{0.5\baselineskip}
+		
+		\vfill
+		
+		\begin{center}
+			\includegraphics[width=5cm]{report_file/iiit manipur.png}
+		\end{center}
+	
+	{\scshape\small Department of Computer Science and Engineering\\ Indian Institute of Information Technology Senapati, Manipur \\ MAY, 2026}
+	
+\end{titlepage}
+
+%----------------------------------------------------------------------------------------
+
+\begin{center}
+   { \LARGE \textbf{Declaration}}
+\end{center}
+In this submission, I have expressed my idea in my own words, and I have adequately cited
+and referenced any ideas or words that were taken from another source. I also declare that I
+adhere to all principles of academic honesty and integrity and that I have not misrepresented
+or falsified any ideas, data, facts, or sources in this submission. If any violation of the above is
+made, I understand that the institute may take disciplinary action. Such a violation may also
+engender disciplinary action from the sources which were not properly cited or permission
+not taken when needed
+
+\vspace{1cm}
+
+\begin{flushright}
+{\small THIRUMALASETTY KARTHIK} \\
+\vspace{0.3cm}
+230101007
+\end{flushright}
+
+\vspace{1cm}
+
+DATE:\newpage
+\thispagestyle{empty}
+
+% ===== HEADER (Logo + Text Side-by-Side) =====
+\begin{center}
+\begin{tabular}{c l}
+\includegraphics[scale=0.2]{report_file/iiit manipur.png} &
+\begin{tabular}[c]{l}
+Department of Computer Science and Engineering \\
+Indian Institute of Information Technology Senapati, Manipur
+\end{tabular}
+\end{tabular}
+\end{center}
+
+\vspace{0.3cm}
+\par\noindent\rule{\textwidth}{0.4pt}
+
+{\small
+DR. NONGMEIKAPAM KISHORJIT SINGH \hfill Email: \href{mailto:kishorjit@iiitmanipur.ac.in}{kishorjit@iiitmanipur.ac.in}\\
+Assistant Professor, Dept. of CSE \hfill Contact No: +91 89740 08610
+}
+
+\vspace{1.2cm}
+
+\begin{center}
+{\Huge \textbf{\emph{To Whom It May Concern}}}
+
+\vspace{1.2cm}
+
+\linespread{1.1}
+\large
+This is to certify that the project report entitled 
+\textbf{``EffectGuard: A State-Level Execution Safety Gateway and Chaos-Tested Reliability Harness for Autonomous Tool-Calling Agents'',}
+submitted to the department of Computer Science and Engineering, Indian Institute of Information Technology Senapati, Manipur in partial fulfilment for the award of degree of Bachelor of Technology in Computer Science and Engineering is a record of bonafide work carried out by \textbf{Thirumalasetty Karthik} bearing roll number 230101007 for the course Project - II (CS4202).
+\end{center}
+
+\vspace{0.8cm}
+
+% ===== SUPERVISOR SIGN =====
+\begin{flushright}
+\large Signature of Supervisor\\[0.2cm]
+\textbf{(DR. NONGMEIKAPAM KISHORJIT SINGH)}
+\end{flushright}
+
+\vspace{1cm}
+
+% ===== EXAMINER SIGNATURES (Reduced Dots, Clean) =====
+\noindent Signature of the Examiner 1 \hspace{0.1cm}\makebox[3cm]{\dotfill}\\[0.3cm]
+\noindent Signature of the Examiner 2 \hspace{0.1cm}\makebox[3cm]{\dotfill}\\[0.3cm]
+\noindent Signature of the Examiner 3 \hspace{0.1cm}\makebox[3cm]{\dotfill}\\[0.3cm]
+\noindent Signature of the Examiner 4 \hspace{0.1cm}\makebox[3cm]{\dotfill}
+
+\begin{abstract}
+Today, artificial intelligence agents powered by Large Language Models are moving far beyond simple conversational chatbots. In real-world enterprise systems, they are now directly trusted to interact with live software tools, query databases, and issue actual financial refunds. However, most existing safety evaluations only test whether the agent's chat responses sound polite and articulate, completely ignoring what actually happens to the persistent database behind the scenes. This creates a critical real-world problem: an AI agent might politely tell a customer that their refund was approved when no database action was actually taken, silently alter records without informing the customer, or repeatedly duplicate payouts whenever an unstable internet connection drops right after a transaction has committed.
+
+In this project, we introduce \textbf{EffectGuard}, an execution safety gateway, and \textbf{AgentSentinel}, a chaos testing harness designed to bring real-world reliability to autonomous AI agents. Rather than trusting the language model to follow business rules described in plain text prompts, EffectGuard sits between the AI agent and the database like an intelligent, deterministic firewall. It validates core business policies in code (such as checking 30-day return windows, verifying customer identities, and enforcing maximum refund limits), computes unique cryptographic keys to ensure network retries never trigger duplicate payouts, and automatically verifies database records if a network timeout occurs. We also built an automated auditor that directly verifies whether the agent's conversational claims match the physical database ledger. Evaluated across 25 real-world customer service scenarios tested under network dropouts (up to 35\% socket drops), standard agents repeatedly issued duplicate refunds and lost money (over Rs.~125.00 excess loss), whereas EffectGuard achieved \textbf{zero duplicate tickets, zero financial loss (Rs.~0.00), a 75.7\% reduction in response delay}, and \textbf{100\% successful resolution} for all valid customer refund requests.
+\end{abstract}
+
+\pagebreak
+	
+\begin{center}
+    {\LARGE \textbf{Acknowledgement}}
+\end{center}
+\vspace{1.5cm}
+
+I express my deepest gratitude to my project supervisor, Dr Nongmeikapam Kishorjit Singh, Assistant Professor in the Department of Computer Science and Engineering, Indian Institute of Information Technology Senapati, Manipur, for his continuous guidance, valuable technical feedback, and steady encouragement throughout the course of this project. His practical insights into distributed systems, machine learning engineering, and software reliability were instrumental in guiding the architectural decisions and evaluation methodology of EffectGuard.
+
+I would also like to thank the faculty members and staff of the Department of Computer Science and Engineering at IIIT Manipur for providing the academic foundation, computational resources, and supportive environment required to conduct this work. Finally, I am grateful to my peers for their thoughtful discussions, constructive critiques, and camaraderie during the development and testing phases.
+
+\vspace{1.5cm}
+
+\begin{flushright}
+    Thirumalasetty Karthik
+\end{flushright}
+
+	\vspace{1cm}
+	
+	\tableofcontents
+	\listoffigures
+    \listoftables
+	\chapter{Introduction}
+	\input{chapters/1_Introduction}
+    \chapter{Literature Survey}
+    \input{chapters/2_Literature_Survey}
+    \chapter{Requirement Engineering}
+    \input{chapters/3_Requirement}
+    \chapter{System Design}
+    \input{chapters/4_System_Design}
+    \chapter{Implementation}
+    \input{chapters/5_Implementation}
+    \chapter{Results and Discussion}
+    \input{chapters/6_Results}
+    \chapter{Conclusion and Future Work}
+    \input{chapters/7_Conclusion}
+        
+    \bibliography{report}
+	\bibliographystyle{plain}
+        
+\end{document}
