@@ -1,4 +1,4 @@
-# AgentSentinel: Enterprise Agent Evaluation & Policy Guardrail Harness
+# AgentSentinel: Enterprise LLM Agent Evaluation & Execution Safety Gateway
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-ReAct%20Agent-orange.svg)](https://github.com/langchain-ai/langgraph)
